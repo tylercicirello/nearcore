@@ -2647,6 +2647,7 @@ dependencies = [
  "near-network",
  "near-primitives",
  "near-rpc-error-macro",
+ "near-store",
  "prometheus",
  "serde",
  "serde_json",

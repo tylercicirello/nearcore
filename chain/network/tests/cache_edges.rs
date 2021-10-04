@@ -5,10 +5,9 @@ use borsh::de::BorshDeserialize;
 use chrono::{DateTime, Duration, Utc};
 
 use near_crypto::Signature;
-use near_network::routing::{
-    Edge, EdgeType, RoutingTable, SAVE_PEERS_AFTER_TIME, SAVE_PEERS_MAX_TIME,
-};
+use near_network::routing::{Edge, EdgeType, SAVE_PEERS_AFTER_TIME, SAVE_PEERS_MAX_TIME};
 use near_network::test_utils::random_peer_id;
+use near_network::RoutingTableActor;
 use near_primitives::network::PeerId;
 use near_store::test_utils::create_test_store;
 use near_store::{ColComponentEdges, ColPeerComponent, Store};
@@ -24,7 +23,7 @@ impl EdgeDescription {
 }
 
 struct RoutingTableTest {
-    routing_table: RoutingTable,
+    routing_table: RoutingTableActor,
     store: Arc<Store>,
     peers: Vec<PeerId>,
     rev_peers: HashMap<PeerId, usize>,
@@ -38,7 +37,7 @@ impl RoutingTableTest {
         let now = Utc::now();
 
         Self {
-            routing_table: RoutingTable::new(me.clone(), store.clone()),
+            routing_table: RoutingTableActor::new(me.clone(), store.clone()),
             store,
             peers: vec![me.clone()],
             rev_peers: vec![(me, 0)].into_iter().collect(),
@@ -212,7 +211,7 @@ fn load_component_nonce_on_start() {
     test.add_edge(0, 1, 2);
     test.set_times(vec![(1, 2)]);
     test.update();
-    let routing_table = RoutingTable::new(random_peer_id(), test.store.clone());
+    let routing_table = RoutingTableActor::new(random_peer_id(), test.store.clone());
     assert_eq!(routing_table.component_nonce, 1);
 }
 
@@ -230,7 +229,7 @@ fn load_component_nonce_2_on_start() {
         vec![(0, vec![(0, 1, false)]), (1, vec![(0, 2, false)])],
         vec![(1, 0), (2, 1)],
     );
-    let routing_table = RoutingTable::new(random_peer_id(), test.store.clone());
+    let routing_table = RoutingTableActor::new(random_peer_id(), test.store.clone());
     assert_eq!(routing_table.component_nonce, 2);
 }
 

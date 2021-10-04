@@ -5,29 +5,7 @@ use std::sync::{Arc, Mutex, RwLock};
 use std::time::Duration;
 
 use actix::actors::mocker::Mocker;
-use actix::{Actor, ActorContext, Addr, Context, Handler, MailboxError, Message, SyncArbiter};
-use futures::future::BoxFuture;
-use futures::{future, FutureExt};
-use lazy_static::lazy_static;
-use rand::{thread_rng, RngCore};
-use tracing::debug;
-
-use near_crypto::{KeyType, SecretKey};
-use near_primitives::block::GenesisId;
-use near_primitives::borsh::maybestd::sync::atomic::AtomicUsize;
-use near_primitives::hash::hash;
-use near_primitives::network::PeerId;
-use near_primitives::types::EpochId;
-use near_primitives::utils::index_to_bytes;
-use near_store::test_utils::create_test_store;
-
-use crate::types::{
-    NetworkInfo, NetworkViewClientMessages, NetworkViewClientResponses, PeerInfo, ReasonForBan,
-};
-use crate::{
-    NetworkAdapter, NetworkClientMessages, NetworkClientResponses, NetworkConfig, NetworkRequests,
-    NetworkResponses, PeerManagerActor, RoutingTableActor,
-};
+use actix::{Actor, ActorContext, Addr, Context, Handler, MailboxError, Message};
 
 type ClientMock = Mocker<NetworkClientMessages>;
 type ViewClientMock = Mocker<NetworkViewClientMessages>;
@@ -279,20 +257,18 @@ impl MockNetworkAdapter {
     }
 }
 
-pub fn make_ibf_routing_pool() -> Addr<RoutingTableActor> {
-    SyncArbiter::start(1, move || RoutingTableActor::default())
+pub fn make_routing_table_actor(peer_id: PeerId, store: Arc<Store>) -> Addr<RoutingTableActor> {
+    RoutingTableActor::new(peer_id, store).start()
 }
 
 #[allow(dead_code)]
 pub fn make_peer_manager(
-    seed: &str,
-    port: u16,
+    store: Arc<Store>,
+    mut config: NetworkConfig,
     boot_nodes: Vec<(&str, u16)>,
     peer_max_count: u32,
     ibf_routing_pool: Addr<RoutingTableActor>,
 ) -> (PeerManagerActor, PeerId, Arc<AtomicUsize>) {
-    let store = create_test_store();
-    let mut config = NetworkConfig::from_seed(seed, port);
     config.boot_nodes = convert_boot_nodes(boot_nodes);
     config.max_num_peers = peer_max_count;
     let counter = Arc::new(AtomicUsize::new(0));
