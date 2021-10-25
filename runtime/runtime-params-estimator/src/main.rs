@@ -20,6 +20,7 @@ use std::path::PathBuf;
 use std::process::Command;
 use std::sync::Arc;
 use std::time;
+use near_primitives::time::{Utc, MockTime};
 
 #[derive(Clap)]
 struct CliArgs {
@@ -188,7 +189,7 @@ fn main() -> anyhow::Result<()> {
     );
 
     let output_path = {
-        let timestamp = chrono::Utc::now().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
+        let timestamp = Utc::now_or_mock().to_rfc3339_opts(chrono::SecondsFormat::Secs, true);
         let commit =
             exec("git rev-parse --short HEAD").map(|hash| format!("-{}", hash)).unwrap_or_default();
         let file_name = format!("costs-{}{}.txt", timestamp, commit);

@@ -1,10 +1,10 @@
+use near_primitives::time::Instant;
 use std::collections::HashMap;
 use std::convert::{Into, TryInto};
 use std::fmt;
 use std::fmt::{Debug, Formatter};
 use std::io;
 use std::sync::{Arc, Mutex, RwLock};
-use std::time::Instant;
 
 use actix::dev::{MessageResponse, ResponseChannel};
 use actix::{Actor, Addr, MailboxError, Message, Recipient};

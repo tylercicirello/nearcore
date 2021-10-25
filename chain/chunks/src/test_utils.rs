@@ -1,7 +1,7 @@
 use std::convert::TryFrom;
 use std::sync::Arc;
 
-use chrono::Utc;
+use near_primitives::time::{Utc, MockTime};
 
 use near_chain::test_utils::KeyValueRuntime;
 use near_chain::types::RuntimeAdapter;
@@ -68,7 +68,7 @@ impl Default for SealsManagerTestFixture {
             Default::default(),
             Default::default(),
             Default::default(),
-            Utc::now(),
+            Utc::now_or_mock(),
             Default::default(),
             Default::default(),
             Default::default(),

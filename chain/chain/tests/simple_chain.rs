@@ -4,17 +4,54 @@ use near_logger_utils::init_test_logger;
 use near_primitives::hash::CryptoHash;
 use near_primitives::version::PROTOCOL_VERSION;
 use num_rational::Rational;
+use near_primitives::time::{MockTimeSingleton};
+use chrono::TimeZone;
+use chrono;
+use std::str::FromStr;
 
 #[test]
 fn empty_chain() {
     init_test_logger();
+    let mock_time = MockTimeSingleton::get();
+    mock_time.lock().unwrap().reset();    
+    let now = chrono::Utc.ymd(2020, 10, 1).and_hms_milli(0, 0, 1, 444);
+    mock_time.lock().unwrap().add_utc(now);
+
     let (chain, _, _) = setup();
+    let count_instant = { mock_time.lock().unwrap().get_instant_call_count() };
+    let count_utc = { mock_time.lock().unwrap().get_utc_call_count() };
+
     assert_eq!(chain.head().unwrap().height, 0);
+    assert_eq!(chain.head().unwrap().last_block_hash, CryptoHash::from_str("ED2pukQzADa3rPKzmSkVV4vA3J6DLASBsU9WRbesKywZ").unwrap());
+    assert_eq!(count_utc, 1);
+    assert_eq!(count_instant, 0);
 }
 
 #[test]
 fn build_chain() {
     init_test_logger();
+    let mock_time = MockTimeSingleton::get();    
+    mock_time.lock().unwrap().reset();    
+    mock_time.lock().unwrap().add_utc(chrono::Utc.ymd(2020, 10, 1).and_hms_milli(0, 0, 3, 444));    
+    mock_time.lock().unwrap().add_utc(chrono::Utc.ymd(2020, 10, 1).and_hms_milli(0, 0, 3, 454));    
+    mock_time.lock().unwrap().add_utc(chrono::Utc.ymd(2020, 10, 1).and_hms_milli(0, 0, 3, 474));    
+    mock_time.lock().unwrap().add_utc(chrono::Utc.ymd(2020, 10, 1).and_hms_milli(0, 0, 3, 484));    
+
+    mock_time.lock().unwrap().add_utc(chrono::Utc.ymd(2020, 10, 1).and_hms_milli(0, 0, 4, 544));    
+    mock_time.lock().unwrap().add_utc(chrono::Utc.ymd(2020, 10, 1).and_hms_milli(0, 0, 4, 644));    
+    mock_time.lock().unwrap().add_utc(chrono::Utc.ymd(2020, 10, 1).and_hms_milli(0, 0, 4, 744));    
+    mock_time.lock().unwrap().add_utc(chrono::Utc.ymd(2020, 10, 1).and_hms_milli(0, 0, 4, 844));    
+
+    mock_time.lock().unwrap().add_utc(chrono::Utc.ymd(2020, 10, 1).and_hms_milli(0, 0, 5, 544));    
+    mock_time.lock().unwrap().add_utc(chrono::Utc.ymd(2020, 10, 1).and_hms_milli(0, 0, 5, 644));    
+    mock_time.lock().unwrap().add_utc(chrono::Utc.ymd(2020, 10, 1).and_hms_milli(0, 0, 5, 744));    
+    mock_time.lock().unwrap().add_utc(chrono::Utc.ymd(2020, 10, 1).and_hms_milli(0, 0, 5, 844));    
+
+    mock_time.lock().unwrap().add_utc(chrono::Utc.ymd(2020, 10, 1).and_hms_milli(0, 0, 6, 544));    
+    mock_time.lock().unwrap().add_utc(chrono::Utc.ymd(2020, 10, 1).and_hms_milli(0, 0, 6, 644));    
+    mock_time.lock().unwrap().add_utc(chrono::Utc.ymd(2020, 10, 1).and_hms_milli(0, 0, 6, 744));    
+    mock_time.lock().unwrap().add_utc(chrono::Utc.ymd(2020, 10, 1).and_hms_milli(0, 0, 6, 844));    
+
     let (mut chain, _, signer) = setup();
     for i in 0..4 {
         let prev_hash = *chain.head_header().unwrap().hash();
@@ -26,6 +63,11 @@ fn build_chain() {
         assert_eq!(tip.unwrap().height, i + 1);
     }
     assert_eq!(chain.head().unwrap().height, 4);
+    let count_instant = { mock_time.lock().unwrap().get_instant_call_count() };
+    let count_utc = { mock_time.lock().unwrap().get_utc_call_count() };    
+    assert_eq!(count_utc, 16);
+    assert_eq!(count_instant, 3);
+    assert_eq!(chain.head().unwrap().last_block_hash, CryptoHash::from_str("ED2pukQzADa3rPKzmSkVV4vA3J6DLASBsU9WRbesKywZ").unwrap());
 }
 
 #[test]

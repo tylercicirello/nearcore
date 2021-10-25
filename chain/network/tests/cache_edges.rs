@@ -2,7 +2,8 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
 use borsh::de::BorshDeserialize;
-use chrono::{DateTime, Duration, Utc};
+use chrono::{DateTime, Duration};
+use near_primitives::time::{Utc, MockTime};
 
 use near_crypto::Signature;
 use near_network::routing::{
@@ -35,7 +36,7 @@ impl RoutingTableTest {
     fn new() -> Self {
         let me = random_peer_id();
         let store = create_test_store();
-        let now = Utc::now();
+        let now = Utc::now_or_mock();
 
         Self {
             routing_table: RoutingTable::new(me.clone(), store.clone()),

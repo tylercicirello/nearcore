@@ -1,10 +1,9 @@
+use near_primitives::time::{Instant, MockTime};
 use std::collections::{hash_map::Entry, HashMap, HashSet, VecDeque};
 use std::ops::Sub;
 use std::sync::{Arc, Mutex};
-use std::time::Instant;
 
 use cached::{Cached, SizedCache};
-use chrono;
 use conqueue::{QueueReceiver, QueueSender};
 #[cfg(feature = "test_features")]
 use serde::{Deserialize, Serialize};
@@ -583,7 +582,7 @@ impl RoutingTable {
                             if cur_nonce == nonce {
                                 self.peer_last_time_reachable.insert(
                                     peer_id.clone(),
-                                    chrono::Utc::now()
+                                    chrono::Utc::now_or_mock()
                                         .sub(chrono::Duration::seconds(SAVE_PEERS_MAX_TIME as i64)),
                                 );
                                 update
@@ -599,7 +598,7 @@ impl RoutingTable {
                 warn!(target: "network", "Error removing network component from store. {:?}", e);
             }
         } else {
-            self.peer_last_time_reachable.insert(peer_id.clone(), chrono::Utc::now());
+            self.peer_last_time_reachable.insert(peer_id.clone(), chrono::Utc::now_or_mock());
         }
     }
 
@@ -703,7 +702,7 @@ impl RoutingTable {
         if let Some(nonces) = self.waiting_pong.cache_get_mut(&pong.source) {
             res = nonces
                 .cache_remove(&(pong.nonce as usize))
-                .and_then(|sent| Some(Instant::now().duration_since(sent).as_secs_f64() * 1000f64));
+                .and_then(|sent| Some(Instant::now_or_mock().duration_since(sent).as_secs_f64() * 1000f64));
         }
 
         let cnt = self.pong_info.cache_get(&(pong.nonce as usize)).map(|v| v.1).unwrap_or(0);
@@ -722,7 +721,7 @@ impl RoutingTable {
             self.waiting_pong.cache_get_mut(&target).unwrap()
         };
 
-        entry.cache_set(nonce, Instant::now());
+        entry.cache_set(nonce, Instant::now_or_mock());
     }
 
     pub fn get_ping(&mut self, peer_id: PeerId) -> usize {
@@ -752,7 +751,7 @@ impl RoutingTable {
     }
 
     fn try_save_edges(&mut self, force_pruning: bool, timeout: u64) -> Vec<Edge> {
-        let now = chrono::Utc::now();
+        let now = chrono::Utc::now_or_mock();
         let mut oldest_time = now;
         let to_save = self
             .peer_last_time_reachable
@@ -823,7 +822,7 @@ impl RoutingTable {
 
         self.peer_forwarding = self.raw_graph.calculate_distance();
 
-        let now = chrono::Utc::now();
+        let now = chrono::Utc::now_or_mock();
         for peer in self.peer_forwarding.keys() {
             self.peer_last_time_reachable.insert(peer.clone(), now);
         }

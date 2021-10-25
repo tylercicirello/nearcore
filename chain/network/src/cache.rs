@@ -1,7 +1,7 @@
 use std::collections::btree_map;
 use std::collections::{BTreeMap, BTreeSet, HashMap};
 
-use chrono::Utc;
+use near_primitives::time::{Utc, MockTime};
 
 use near_primitives::hash::CryptoHash;
 use near_primitives::network::PeerId;
@@ -117,7 +117,7 @@ impl RouteBackCache {
         if self.is_full() {
             self.remove_frequent();
 
-            let now = Utc::now().timestamp_millis() as Time;
+            let now = Utc::now_or_mock().timestamp_millis() as Time;
             let remove_until = now.saturating_sub(self.evict_timeout);
 
             let mut remove_empty = vec![];
@@ -209,7 +209,7 @@ impl RouteBackCache {
 
         self.remove_evicted();
 
-        let now = Utc::now().timestamp_millis() as Time;
+        let now = Utc::now_or_mock().timestamp_millis() as Time;
 
         self.main.insert(hash, (now, target.clone()));
 

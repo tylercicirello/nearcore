@@ -11,6 +11,7 @@ use tokio::time::interval;
 use crate::remote_node::{try_wait, wait, RemoteNode};
 use crate::stats::Stats;
 use crate::transactions_generator::{Generator, TransactionType};
+use near_primitives::time::MockTime;
 
 pub struct Executor {
     /// Nodes that can be used to generate nonces
@@ -111,11 +112,11 @@ impl Executor {
 
                 // Spawn the task that sets the tps.
                 let period = Duration::from_nanos((Duration::from_secs(1).as_nanos() as u64) / tps);
-                let timeout = timeout.map(|t| Instant::now() + t);
+                let timeout = timeout.map(|t| Instant::now_or_mock() + t);
                 let task = tokio_stream::wrappers::IntervalStream::new(interval(period))
                     .take_while(move |_| {
                         if let Some(t_limit) = timeout {
-                            if t_limit <= Instant::now() {
+                            if t_limit <= Instant::now_or_mock() {
                                 // We hit timeout.
                                 return future::ready(false);
                             }

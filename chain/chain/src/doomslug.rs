@@ -8,6 +8,7 @@ use near_primitives::block::{Approval, ApprovalInner};
 use near_primitives::hash::CryptoHash;
 use near_primitives::types::{AccountId, ApprovalStake, Balance, BlockHeight, BlockHeightDelta};
 use near_primitives::validator_signer::ValidatorSigner;
+use near_primitives::time::MockTime;
 
 /// Have that many iterations in the timer instead of `loop` to prevent potential bugs from blocking
 /// the node
@@ -297,8 +298,8 @@ impl Doomslug {
             tip: DoomslugTip { block_hash: CryptoHash::default(), height: 0 },
             endorsement_pending: false,
             timer: DoomslugTimer {
-                started: Instant::now(),
-                last_endorsement_sent: Instant::now(),
+                started: Instant::now_or_mock(),
+                last_endorsement_sent: Instant::now_or_mock(),
                 height: 0,
                 endorsement_delay,
                 min_delay,
@@ -604,6 +605,8 @@ mod tests {
     use near_primitives::hash::hash;
     use near_primitives::types::{AccountId, ApprovalStake};
     use near_primitives::validator_signer::InMemoryValidatorSigner;
+    use near_primitives::time::MockTime;
+
 
     use crate::doomslug::{
         DoomslugApprovalsTrackersAtHeight, DoomslugBlockProductionReadiness, DoomslugThresholdMode,
@@ -626,7 +629,7 @@ mod tests {
             DoomslugThresholdMode::TwoThirds,
         );
 
-        let mut now = Instant::now(); // For the test purposes the absolute value of the initial instant doesn't matter
+        let mut now = Instant::now_or_mock(); // For the test purposes the absolute value of the initial instant doesn't matter
 
         // Set a new tip, must produce an endorsement
         ds.set_tip(now, hash(&[1]), 1, 1);
@@ -782,7 +785,7 @@ mod tests {
             DoomslugThresholdMode::TwoThirds,
         );
 
-        let mut now = Instant::now();
+        let mut now = Instant::now_or_mock();
 
         // In the comments below the format is
         // account, height -> approved stake
@@ -915,7 +918,7 @@ mod tests {
         let a2_3 = Approval::new(hash(&[3]), 3, 4, &signers[2]);
 
         // Process first approval, and then process it again and make sure it works
-        tracker.process_approval(Instant::now(), &a1_1, &stakes, DoomslugThresholdMode::TwoThirds);
+        tracker.process_approval(Instant::now_or_mock(), &a1_1, &stakes, DoomslugThresholdMode::TwoThirds);
 
         assert_eq!(
             tracker
@@ -935,7 +938,7 @@ mod tests {
             0
         );
 
-        tracker.process_approval(Instant::now(), &a1_1, &stakes, DoomslugThresholdMode::TwoThirds);
+        tracker.process_approval(Instant::now_or_mock(), &a1_1, &stakes, DoomslugThresholdMode::TwoThirds);
 
         assert_eq!(
             tracker
@@ -956,8 +959,8 @@ mod tests {
         );
 
         // Process the remaining two approvals on the first block
-        tracker.process_approval(Instant::now(), &a1_2, &stakes, DoomslugThresholdMode::TwoThirds);
-        tracker.process_approval(Instant::now(), &a1_3, &stakes, DoomslugThresholdMode::TwoThirds);
+        tracker.process_approval(Instant::now_or_mock(), &a1_2, &stakes, DoomslugThresholdMode::TwoThirds);
+        tracker.process_approval(Instant::now_or_mock(), &a1_3, &stakes, DoomslugThresholdMode::TwoThirds);
 
         assert_eq!(
             tracker
@@ -978,7 +981,7 @@ mod tests {
         );
 
         // Process new approvals one by one, expect the approved and endorsed stake to slowly decrease
-        tracker.process_approval(Instant::now(), &a2_1, &stakes, DoomslugThresholdMode::TwoThirds);
+        tracker.process_approval(Instant::now_or_mock(), &a2_1, &stakes, DoomslugThresholdMode::TwoThirds);
 
         assert_eq!(
             tracker
@@ -998,7 +1001,7 @@ mod tests {
             5
         );
 
-        tracker.process_approval(Instant::now(), &a2_2, &stakes, DoomslugThresholdMode::TwoThirds);
+        tracker.process_approval(Instant::now_or_mock(), &a2_2, &stakes, DoomslugThresholdMode::TwoThirds);
 
         assert_eq!(
             tracker
@@ -1019,7 +1022,7 @@ mod tests {
         );
 
         // As we update the last of the three approvals, the tracker for the first block should be completely removed
-        tracker.process_approval(Instant::now(), &a2_3, &stakes, DoomslugThresholdMode::TwoThirds);
+        tracker.process_approval(Instant::now_or_mock(), &a2_3, &stakes, DoomslugThresholdMode::TwoThirds);
 
         assert!(tracker.approval_trackers.get(&ApprovalInner::Skip(1)).is_none());
 
@@ -1044,7 +1047,7 @@ mod tests {
             5
         );
 
-        tracker.process_approval(Instant::now(), &a2_3, &stakes, DoomslugThresholdMode::TwoThirds);
+        tracker.process_approval(Instant::now_or_mock(), &a2_3, &stakes, DoomslugThresholdMode::TwoThirds);
 
         assert_eq!(
             tracker

@@ -4,7 +4,7 @@ mod tests {
     use std::collections::{HashMap, HashSet};
     use std::sync::Arc;
     use std::time::{Duration, Instant};
-
+    use near_primitives::time::MockTime;
     use rand::{thread_rng, Rng};
 
     use near_chain::{Doomslug, DoomslugThresholdMode};
@@ -75,7 +75,7 @@ mod tests {
             })
             .collect::<Vec<_>>();
 
-        let mut now = Instant::now();
+        let mut now = Instant::now_or_mock();
         let started = now;
 
         let gst = now + time_to_gst;
