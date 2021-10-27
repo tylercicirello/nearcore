@@ -8,6 +8,10 @@ use near_client::ViewClientActor;
 use near_jsonrpc::{start_http, RpcConfig};
 use near_network::test_utils::open_port;
 #[cfg(feature = "test_features")]
+use near_network::test_utils::{make_peer_manager, make_routing_table_actor};
+#[cfg(feature = "test_features")]
+use near_network::NetworkConfig;
+#[cfg(feature = "test_features")]
 use near_primitives::types::NumBlocks;
 #[cfg(feature = "test_features")]
 use near_store::test_utils::create_test_store;

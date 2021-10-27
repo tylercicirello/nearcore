@@ -326,8 +326,6 @@ impl PeerManagerActor {
 
         near_performance_metrics::actix::run_later(
             ctx,
-            file!(),
-            line!(),
             Duration::from_millis(1000),
             move |act, ctx| {
                 act.update_routing_table(ctx);
@@ -406,26 +404,20 @@ impl PeerManagerActor {
         addr: Addr<Peer>,
         ctx: &mut Context<Self>,
     ) {
-        near_performance_metrics::actix::run_later(
-            ctx,
-            file!(),
-            line!(),
-            WAIT_FOR_SYNC_DELAY,
-            move |act2, ctx2| {
-                if peer_type == PeerType::Inbound {
-                    act2.routing_table_addr
-                        .send(RoutingTableMessages::AddPeerIfMissing(peer_id, None))
-                        .into_actor(act2)
-                        .map(move |response, act3, ctx3| match response {
-                            Ok(RoutingTableMessagesResponse::AddPeerResponse { seed }) => {
-                                act3.start_routing_table_syncv2(ctx3, addr, seed)
-                            }
-                            _ => error!(target: "network", "expected AddIbfSetResponse"),
-                        })
-                        .spawn(ctx2);
-                }
-            },
-        );
+        near_performance_metrics::actix::run_later(ctx, WAIT_FOR_SYNC_DELAY, move |act2, ctx2| {
+            if peer_type == PeerType::Inbound {
+                act2.routing_table_addr
+                    .send(RoutingTableMessages::AddPeerIfMissing(peer_id, None))
+                    .into_actor(act2)
+                    .map(move |response, act3, ctx3| match response {
+                        Ok(RoutingTableMessagesResponse::AddPeerResponse { seed }) => {
+                            act3.start_routing_table_syncv2(ctx3, addr, seed)
+                        }
+                        _ => error!(target: "network", "expected AddIbfSetResponse"),
+                    })
+                    .spawn(ctx2);
+            }
+        });
     }
 
     #[cfg(feature = "protocol_feature_routing_exchange_algorithm")]
@@ -505,33 +497,27 @@ impl PeerManagerActor {
                 return;
             }
         );
-        near_performance_metrics::actix::run_later(
-            ctx,
-            file!(),
-            line!(),
-            WAIT_FOR_SYNC_DELAY,
-            move |act2, ctx2| {
-                act2.routing_table_addr
-                    .send(RoutingTableMessages::RequestRoutingTable)
-                    .into_actor(act2)
-                    .map(move |response, act3, ctx3| match response {
-                        Ok(RoutingTableMessagesResponse::RequestRoutingTableResponse {
-                            edges_info: routing_table,
-                        }) => {
-                            act3.send_sync(
-                                peer_type,
-                                addr,
-                                ctx3,
-                                target_peer_id.clone(),
-                                new_edge,
-                                routing_table,
-                            );
-                        }
-                        _ => error!(target: "network", "expected AddIbfSetResponse"),
-                    })
-                    .spawn(ctx2);
-            },
-        );
+        near_performance_metrics::actix::run_later(ctx, WAIT_FOR_SYNC_DELAY, move |act2, ctx2| {
+            act2.routing_table_addr
+                .send(RoutingTableMessages::RequestRoutingTable)
+                .into_actor(act2)
+                .map(move |response, act3, ctx3| match response {
+                    Ok(RoutingTableMessagesResponse::RequestRoutingTableResponse {
+                        edges_info: routing_table,
+                    }) => {
+                        act3.send_sync(
+                            peer_type,
+                            addr,
+                            ctx3,
+                            target_peer_id.clone(),
+                            new_edge,
+                            routing_table,
+                        );
+                    }
+                    _ => error!(target: "network", "expected AddIbfSetResponse"),
+                })
+                .spawn(ctx2);
+        });
     }
 
     fn send_sync(
