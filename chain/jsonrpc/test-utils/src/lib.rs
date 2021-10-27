@@ -11,7 +11,6 @@ use near_network::test_utils::open_port;
 use near_network::test_utils::{make_peer_manager, make_routing_table_actor};
 #[cfg(feature = "test_features")]
 use near_network::NetworkConfig;
-#[cfg(feature = "test_features")]
 use near_primitives::types::NumBlocks;
 #[cfg(feature = "test_features")]
 use near_store::test_utils::create_test_store;
