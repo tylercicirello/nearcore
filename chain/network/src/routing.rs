@@ -631,10 +631,6 @@ impl RoutingTable {
         let key = Edge::key(peer0, peer1);
         self.edges_info.get(&key).cloned()
     }
-
-    pub fn get_edges_len(&self) -> u64 {
-        self.edges_info.len() as u64
-    }
 }
 
 pub struct ProcessEdgeResult {
