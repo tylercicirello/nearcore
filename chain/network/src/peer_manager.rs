@@ -361,12 +361,11 @@ impl PeerManagerActor {
             }
         }
 
-        // Add new edge update to the routing table.
-        self.add_verified_edges_to_routing_table(ctx, new_edges.clone(), false, true);
-
-        let new_data = SyncData { edges: new_edges, accounts: Default::default() };
+        let new_data = SyncData { edges: new_edges.clone(), accounts: Default::default() };
 
         if !new_data.is_empty() {
+            // Add new edge update to the routing table.
+            self.add_verified_edges_to_routing_table(ctx, new_edges, false, true);
             #[cfg(not(feature = "test_features"))]
             let condition = true;
             #[cfg(feature = "test_features")]
