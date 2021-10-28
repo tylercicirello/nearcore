@@ -334,7 +334,7 @@ pub fn start_with_config(home_dir: &Path, config: NearConfig) -> NearNode {
     let routing_table_addr =
         make_routing_table_actor(network_config.public_key.clone().into(), store.clone());
     #[cfg(all(feature = "json_rpc", feature = "test_features"))]
-    let network_config2 = routing_table_addr.clone();
+    let routing_table_addr2 = routing_table_addr.clone();
     let network_actor = PeerManagerActor::start_in_arbiter(&arbiter.handle(), move |_ctx| {
         PeerManagerActor::new(
             store,
@@ -356,7 +356,7 @@ pub fn start_with_config(home_dir: &Path, config: NearConfig) -> NearNode {
             #[cfg(feature = "test_features")]
             network_actor.clone(),
             #[cfg(feature = "test_features")]
-            network_config2,
+            routing_table_addr2,
         ));
     }
 
