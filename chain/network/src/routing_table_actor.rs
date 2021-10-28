@@ -156,6 +156,7 @@ impl RoutingTableActor {
                             if cur_nonce == nonce {
                                 self.peer_last_time_reachable.insert(
                                     peer_id.clone(),
+                                    // TODO #(PIOTR, 5089) Let's stop using non-monotonic time.
                                     chrono::Utc::now()
                                         .sub(chrono::Duration::seconds(SAVE_PEERS_MAX_TIME as i64)),
                                 );
