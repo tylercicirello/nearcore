@@ -50,9 +50,7 @@ pub fn start_all_with_validity_period_and_no_epoch_sync(
     let addr = format!("127.0.0.1:{}", port);
     let config = RpcConfig::new(&addr);
     #[cfg(feature = "test_features")]
-    let seed = "test2";
-    #[cfg(feature = "test_features")]
-    let net_config = NetworkConfig::from_seed(seed, port);
+    let net_config = NetworkConfig::from_seed("test2", port);
     #[cfg(feature = "test_features")]
     let store = create_test_store();
     #[cfg(feature = "test_features")]
