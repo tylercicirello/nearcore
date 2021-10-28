@@ -430,6 +430,10 @@ impl RoutingTable {
         }
     }
 
+    pub fn find_nonce(&self, edge: &(PeerId, PeerId)) -> u64 {
+        self.local_edges_info.get(&edge).map_or(0, |x| x.nonce)
+    }
+
     pub fn reachable_peers(&self) -> impl Iterator<Item = &PeerId> {
         self.peer_forwarding.keys()
     }

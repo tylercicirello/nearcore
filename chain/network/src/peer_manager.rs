@@ -128,7 +128,7 @@ pub struct PeerManagerActor {
     /// Networking configuration.
     config: NetworkConfig,
     /// Peer information for this node.
-    peer_id: PeerId,
+    my_peer_id: PeerId,
     /// Address of the client actor.
     client_addr: Recipient<NetworkClientMessages>,
     /// Address of the view client actor.
@@ -190,7 +190,7 @@ impl PeerManagerActor {
         let txns_since_last_block = Arc::new(AtomicUsize::new(0));
 
         Ok(PeerManagerActor {
-            peer_id: me,
+            my_peer_id: me,
             config,
             client_addr,
             view_client_addr,
@@ -256,54 +256,56 @@ impl PeerManagerActor {
         if edges.len() == 0 {
             return;
         }
+        // RoutingTable keeps list of local edges; let's apply changes immediately.
+        for edge in edges.iter() {
+            if !(edge.peer0 == self.my_peer_id || edge.peer1 == self.my_peer_id) {
+                continue;
+            }
+            let key = edge.get_pair();
+            if self.routing_table.find_nonce(&key) >= edge.nonce {
+                continue;
+            }
+            self.routing_table
+                .local_edges_info
+                .insert((edge.peer0.clone(), edge.peer1.clone()), edge.clone());
+            if remove_pending_nonce {
+                let other = edge.other(&self.my_peer_id).unwrap();
+                if let Some(nonce) = self.pending_update_nonce_request.get(&other) {
+                    if edge.nonce >= *nonce {
+                        self.pending_update_nonce_request.remove(&other);
+                    }
+                }
+            }
+            if try_to_remove_peer {
+                // Check whenever peer needs to be removed whence edge is removed.
+                if let Some(other) = edge.other(&self.my_peer_id) {
+                    // We belong to this edge.
+                    if self.active_peers.contains_key(&other) {
+                        // This is an active connection.
+                        match edge.edge_type() {
+                            EdgeType::Added => {}
+                            EdgeType::Removed => {
+                                // Try to update the nonce, and in case it fails removes the peer.
+                                self.try_update_nonce(ctx, edge.clone(), other);
+                            }
+                        }
+                    } else {
+                        match edge.edge_type() {
+                            EdgeType::Added => {
+                                self.wait_peer_or_remove(ctx, edge.clone());
+                            }
+                            EdgeType::Removed => {}
+                        }
+                    }
+                }
+            }
+        }
 
         self.routing_table_addr
             .send(RoutingTableMessages::AddVerifiedEdges { edges })
             .into_actor(self)
             .map(move |response, act2, ctx2| match response {
                 Ok(RoutingTableMessagesResponse::AddVerifiedEdgesResponse(filtered_edges)) => {
-                    let me = act2.peer_id.clone();
-
-                    for edge in filtered_edges.iter() {
-                        if !(edge.peer0 == me || edge.peer1 == me) {
-                            continue;
-                        }
-                        act2.routing_table
-                            .local_edges_info
-                            .insert((edge.peer0.clone(), edge.peer1.clone()), edge.clone());
-                        if remove_pending_nonce {
-                            let other = edge.other(&act2.peer_id).unwrap();
-                            if let Some(nonce) = act2.pending_update_nonce_request.get(&other) {
-                                if edge.nonce >= *nonce {
-                                    act2.pending_update_nonce_request.remove(&other);
-                                }
-                            }
-                        }
-                        if try_to_remove_peer {
-                            // Check whenever peer needs to be removed whence edge is removed.
-                            if let Some(other) = edge.other(&me) {
-                                // We belong to this edge.
-                                if act2.active_peers.contains_key(&other) {
-                                    // This is an active connection.
-                                    match edge.edge_type() {
-                                        EdgeType::Added => {}
-                                        EdgeType::Removed => {
-                                            // Try to update the nonce, and in case it fails removes the peer.
-                                            act2.try_update_nonce(ctx2, edge.clone(), other);
-                                        }
-                                    }
-                                } else {
-                                    match edge.edge_type() {
-                                        EdgeType::Added => {
-                                            act2.wait_peer_or_remove(ctx2, edge.clone());
-                                        }
-                                        EdgeType::Removed => {}
-                                    }
-                                }
-                            }
-                        }
-                    }
-
                     #[cfg(not(feature = "test_features"))]
                     let condition = true;
                     #[cfg(feature = "test_features")]
@@ -468,8 +470,8 @@ impl PeerManagerActor {
         let target_peer_id = full_peer_info.peer_info.id.clone();
 
         let new_edge = Edge::new(
-            self.peer_id.clone(),   // source
-            target_peer_id.clone(), // target
+            self.my_peer_id.clone(), // source
+            target_peer_id.clone(),  // target
             edge_info.nonce,
             edge_info.signature,
             full_peer_info.edge_info.signature.clone(),
@@ -594,9 +596,10 @@ impl PeerManagerActor {
             .map(|_, _, _| ())
             .spawn(ctx);
 
-        if let Some(edge) = self.routing_table.get_edge(self.peer_id.clone(), peer_id.clone()) {
+        if let Some(edge) = self.routing_table.get_edge(self.my_peer_id.clone(), peer_id.clone()) {
             if edge.edge_type() == EdgeType::Added {
-                let edge_update = edge.remove_edge(self.peer_id.clone(), &self.config.secret_key);
+                let edge_update =
+                    edge.remove_edge(self.my_peer_id.clone(), &self.config.secret_key);
                 self.add_verified_edges_to_routing_table(
                     ctx,
                     vec![edge_update.clone()],
@@ -676,7 +679,7 @@ impl PeerManagerActor {
         peer_info: Option<PeerInfo>,
         edge_info: Option<EdgeInfo>,
     ) {
-        let peer_id = self.peer_id.clone();
+        let peer_id = self.my_peer_id.clone();
         let account_id = self.config.account_id.clone();
         let server_addr = self.config.addr;
         let handshake_timeout = self.config.handshake_timeout;
@@ -872,10 +875,10 @@ impl PeerManagerActor {
             ctx,
             Duration::from_millis(WAIT_PEER_BEFORE_REMOVE),
             move |act, ctx| {
-                let other = edge.other(&act.peer_id).unwrap();
+                let other = edge.other(&act.my_peer_id).unwrap();
                 if !act.active_peers.contains_key(&other) {
                     // Peer is still not active after waiting a timeout.
-                    let new_edge = edge.remove_edge(act.peer_id.clone(), &act.config.secret_key);
+                    let new_edge = edge.remove_edge(act.my_peer_id.clone(), &act.config.secret_key);
                     act.broadcast_message(
                         ctx,
                         SendMessage {
@@ -901,7 +904,7 @@ impl PeerManagerActor {
             ctx,
             other.clone(),
             PeerMessage::RequestUpdateNonce(EdgeInfo::new(
-                self.peer_id.clone(),
+                self.my_peer_id.clone(),
                 other.clone(),
                 nonce,
                 &self.config.secret_key,
@@ -1078,7 +1081,7 @@ impl PeerManagerActor {
         if self.is_outbound_bootstrap_needed() {
             if let Some(peer_info) = self.sample_random_peer(|peer_state| {
                 // Ignore connecting to ourself
-                self.peer_id == peer_state.peer_info.id
+                self.my_peer_id == peer_state.peer_info.id
                     || self.config.addr == peer_state.peer_info.addr
                     // Or to peers we are currently trying to connect to
                     || self.outgoing_peers.contains(&peer_state.peer_info.id)
@@ -1245,8 +1248,8 @@ impl PeerManagerActor {
     fn send_signed_message_to_peer(&mut self, ctx: &mut Context<Self>, msg: RoutedMessage) -> bool {
         // Check if the message is for myself and don't try to send it in that case.
         if let PeerIdOrHash::PeerId(target) = &msg.target {
-            if target == &self.peer_id {
-                debug!(target: "network", "{:?} Drop signed message to myself ({:?}). Message: {:?}.", self.config.account_id, self.peer_id, msg);
+            if target == &self.my_peer_id {
+                debug!(target: "network", "{:?} Drop signed message to myself ({:?}). Message: {:?}.", self.config.account_id, self.my_peer_id, msg);
                 return false;
             }
         }
@@ -1254,9 +1257,9 @@ impl PeerManagerActor {
         match self.routing_table.find_route(&msg.target) {
             Ok(peer_id) => {
                 // Remember if we expect a response for this message.
-                if msg.author == self.peer_id && msg.expect_response() {
+                if msg.author == self.my_peer_id && msg.expect_response() {
                     trace!(target: "network", "initiate route back {:?}", msg);
-                    self.routing_table.add_route_back(msg.hash(), self.peer_id.clone());
+                    self.routing_table.add_route_back(msg.hash(), self.my_peer_id.clone());
                 }
 
                 self.send_message(ctx, peer_id, PeerMessage::Routed(msg))
@@ -1316,26 +1319,28 @@ impl PeerManagerActor {
     }
 
     fn sign_routed_message(&self, msg: RawRoutedMessage) -> RoutedMessage {
-        msg.sign(self.peer_id.clone(), &self.config.secret_key, self.config.routed_message_ttl)
+        msg.sign(self.my_peer_id.clone(), &self.config.secret_key, self.config.routed_message_ttl)
     }
 
     // Determine if the given target is referring to us.
     fn message_for_me(&mut self, target: &PeerIdOrHash) -> bool {
         match target {
-            PeerIdOrHash::PeerId(peer_id) => peer_id == &self.peer_id,
+            PeerIdOrHash::PeerId(peer_id) => peer_id == &self.my_peer_id,
             PeerIdOrHash::Hash(hash) => {
-                self.routing_table.compare_route_back(hash.clone(), &self.peer_id)
+                self.routing_table.compare_route_back(hash.clone(), &self.my_peer_id)
             }
         }
     }
 
     fn propose_edge(&self, peer1: PeerId, with_nonce: Option<u64>) -> EdgeInfo {
-        let key = Edge::key(self.peer_id.clone(), peer1.clone());
+        let key = Edge::key(self.my_peer_id.clone(), peer1.clone());
 
         // When we create a new edge we increase the latest nonce by 2 in case we miss a removal
         // proposal from our partner.
         let nonce = with_nonce.unwrap_or_else(|| {
-            self.routing_table.get_edge(self.peer_id.clone(), peer1).map_or(1, |edge| edge.next())
+            self.routing_table
+                .get_edge(self.my_peer_id.clone(), peer1)
+                .map_or(1, |edge| edge.next())
         });
 
         EdgeInfo::new(key.0, key.1, nonce, &self.config.secret_key)
@@ -1346,7 +1351,7 @@ impl PeerManagerActor {
     // for unit tests
     fn send_ping(&mut self, ctx: &mut Context<Self>, nonce: usize, target: PeerId) {
         let body =
-            RoutedMessageBody::Ping(Ping { nonce: nonce as u64, source: self.peer_id.clone() });
+            RoutedMessageBody::Ping(Ping { nonce: nonce as u64, source: self.my_peer_id.clone() });
         self.routing_table.sending_ping(nonce, target.clone());
         let msg = RawRoutedMessage { target: AccountOrPeerIdOrHash::PeerId(target), body };
         self.send_message_to_peer(ctx, msg);
@@ -1354,7 +1359,7 @@ impl PeerManagerActor {
 
     fn send_pong(&mut self, ctx: &mut Context<Self>, nonce: usize, target: CryptoHash) {
         let body =
-            RoutedMessageBody::Pong(Pong { nonce: nonce as u64, source: self.peer_id.clone() });
+            RoutedMessageBody::Pong(Pong { nonce: nonce as u64, source: self.my_peer_id.clone() });
         let msg = RawRoutedMessage { target: AccountOrPeerIdOrHash::Hash(target), body };
         self.send_message_to_peer(ctx, msg);
     }
@@ -1443,7 +1448,7 @@ impl Actor for PeerManagerActor {
                     let incoming = IncomingCrutch {
                         listener: tokio_stream::wrappers::TcpListenerStream::new(listener),
                     };
-                    info!(target: "stats", "Server listening at {}@{}", act.peer_id, server_addr);
+                    info!(target: "stats", "Server listening at {}@{}", act.my_peer_id, server_addr);
                     let pending_incoming_connections_counter =
                         act.pending_incoming_connections_counter.clone();
                     let peer_counter = act.peer_counter.clone();
@@ -1800,9 +1805,9 @@ impl Handler<NetworkRequests> for PeerManagerActor {
                 NetworkResponses::NoResponse
             }
             NetworkRequests::RequestUpdateNonce(peer_id, edge_info) => {
-                if Edge::partial_verify(self.peer_id.clone(), peer_id.clone(), &edge_info) {
+                if Edge::partial_verify(self.my_peer_id.clone(), peer_id.clone(), &edge_info) {
                     if let Some(cur_edge) =
-                        self.routing_table.get_edge(self.peer_id.clone(), peer_id.clone())
+                        self.routing_table.get_edge(self.my_peer_id.clone(), peer_id.clone())
                     {
                         if cur_edge.edge_type() == EdgeType::Added
                             && cur_edge.nonce >= edge_info.nonce
@@ -1812,7 +1817,7 @@ impl Handler<NetworkRequests> for PeerManagerActor {
                     }
 
                     let new_edge = Edge::build_with_secret_key(
-                        self.peer_id.clone(),
+                        self.my_peer_id.clone(),
                         peer_id,
                         edge_info.nonce,
                         &self.config.secret_key,
@@ -1832,7 +1837,7 @@ impl Handler<NetworkRequests> for PeerManagerActor {
                 }
             }
             NetworkRequests::ResponseUpdateNonce(edge) => {
-                if edge.contains_peer(&self.peer_id) && edge.verify() {
+                if edge.contains_peer(&self.my_peer_id) && edge.verify() {
                     self.add_verified_edges_to_routing_table(
                         ctx,
                         vec![edge.clone()],
@@ -1944,7 +1949,7 @@ impl Handler<GetPeerId> for PeerManagerActor {
 
     #[perf]
     fn handle(&mut self, msg: GetPeerId, _ctx: &mut Self::Context) -> GetPeerIdResult {
-        GetPeerIdResult { peer_id: self.peer_id.clone() }
+        GetPeerIdResult { peer_id: self.my_peer_id.clone() }
     }
 }
 
@@ -2022,7 +2027,7 @@ impl Handler<Consolidate> for PeerManagerActor {
 
         // We already connected to this peer.
         if self.active_peers.contains_key(&msg.peer_info.id) {
-            debug!(target: "network", "Dropping handshake (Active Peer). {:?} {:?}", self.peer_id, msg.peer_info.id);
+            debug!(target: "network", "Dropping handshake (Active Peer). {:?} {:?}", self.my_peer_id, msg.peer_info.id);
             return ConsolidateResponse::Reject;
         }
 
@@ -2030,8 +2035,8 @@ impl Handler<Consolidate> for PeerManagerActor {
         // This only happens when both of us connect at the same time, break tie using higher peer id.
         if msg.peer_type == PeerType::Inbound && self.outgoing_peers.contains(&msg.peer_info.id) {
             // We pick connection that has lower id.
-            if msg.peer_info.id > self.peer_id {
-                debug!(target: "network", "Dropping handshake (Tied). {:?} {:?}", self.peer_id, msg.peer_info.id);
+            if msg.peer_info.id > self.my_peer_id {
+                debug!(target: "network", "Dropping handshake (Tied). {:?} {:?}", self.my_peer_id, msg.peer_info.id);
                 return ConsolidateResponse::Reject;
             }
         }
@@ -2047,18 +2052,19 @@ impl Handler<Consolidate> for PeerManagerActor {
             return ConsolidateResponse::Reject;
         }
 
-        let last_edge = self.routing_table.get_edge(self.peer_id.clone(), msg.peer_info.id.clone());
+        let last_edge =
+            self.routing_table.get_edge(self.my_peer_id.clone(), msg.peer_info.id.clone());
         let last_nonce = last_edge.as_ref().map_or(0, |edge| edge.nonce);
 
         // Check that the received nonce is greater than the current nonce of this connection.
         if last_nonce >= msg.other_edge_info.nonce {
-            debug!(target: "network", "Too low nonce. ({} <= {}) {:?} {:?}", msg.other_edge_info.nonce, last_nonce, self.peer_id, msg.peer_info.id);
+            debug!(target: "network", "Too low nonce. ({} <= {}) {:?} {:?}", msg.other_edge_info.nonce, last_nonce, self.my_peer_id, msg.peer_info.id);
             // If the check fails don't allow this connection.
             return ConsolidateResponse::InvalidNonce(last_edge.cloned().map(Box::new).unwrap());
         }
 
         if msg.other_edge_info.nonce >= Edge::next_nonce(last_nonce) + EDGE_NONCE_BUMP_ALLOWED {
-            debug!(target: "network", "Too large nonce. ({} >= {} + {}) {:?} {:?}", msg.other_edge_info.nonce, last_nonce, EDGE_NONCE_BUMP_ALLOWED, self.peer_id, msg.peer_info.id);
+            debug!(target: "network", "Too large nonce. ({} >= {} + {}) {:?} {:?}", msg.other_edge_info.nonce, last_nonce, EDGE_NONCE_BUMP_ALLOWED, self.my_peer_id, msg.peer_info.id);
             return ConsolidateResponse::Reject;
         }
 
@@ -2130,7 +2136,7 @@ impl Handler<PeersResponse> for PeerManagerActor {
         let _d = DelayDetector::new("peers response".into());
         unwrap_or_error!(
             self.peer_store.add_indirect_peers(
-                msg.peers.into_iter().filter(|peer_info| peer_info.id != self.peer_id).collect()
+                msg.peers.into_iter().filter(|peer_info| peer_info.id != self.my_peer_id).collect()
             ),
             "Fail to update peer store"
         );
