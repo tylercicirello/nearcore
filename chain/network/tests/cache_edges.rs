@@ -48,11 +48,12 @@ impl RoutingTableTest {
                 ))
                 .unwrap(),
                 now.checked_sub_signed(Duration::seconds(
-                    ((SAVE_PEERS_AFTER_TIME.as_secs() + SAVE_PEERS_MAX_TIME) / 2) as i64,
+                    ((SAVE_PEERS_AFTER_TIME.as_secs() + SAVE_PEERS_MAX_TIME.as_secs()) / 2) as i64,
                 ))
                 .unwrap(),
                 now.checked_sub_signed(Duration::seconds(
-                    (SAVE_PEERS_MAX_TIME * 3 / 2 - SAVE_PEERS_AFTER_TIME.as_secs() / 2) as i64,
+                    (SAVE_PEERS_MAX_TIME.as_secs() * 3 / 2 - SAVE_PEERS_AFTER_TIME.as_secs() / 2)
+                        as i64,
                 ))
                 .unwrap(),
             ],

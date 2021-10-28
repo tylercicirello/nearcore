@@ -160,8 +160,9 @@ impl RoutingTableActor {
                                 self.peer_last_time_reachable.insert(
                                     peer_id.clone(),
                                     // TODO #(PIOTR, 5089) Let's stop using non-monotonic time.
-                                    chrono::Utc::now()
-                                        .sub(chrono::Duration::seconds(SAVE_PEERS_MAX_TIME as i64)),
+                                    chrono::Utc::now().sub(chrono::Duration::seconds(
+                                        SAVE_PEERS_MAX_TIME.as_secs() as i64,
+                                    )),
                                 );
                                 update
                                     .delete(ColPeerComponent, Vec::from(peer_id.clone()).as_ref());
@@ -248,7 +249,8 @@ impl RoutingTableActor {
         // Save nodes on disk and remove from memory only if elapsed time from oldest peer
         // is greater than `SAVE_PEERS_MAX_TIME`
         if !force_pruning
-            && now.signed_duration_since(oldest_time).num_seconds() < SAVE_PEERS_MAX_TIME as i64
+            && now.signed_duration_since(oldest_time).num_seconds()
+                < SAVE_PEERS_MAX_TIME.as_secs() as i64
         {
             return Vec::new();
         }
