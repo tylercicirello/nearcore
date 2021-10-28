@@ -12,7 +12,7 @@ fn announcement_same_epoch() {
     let peer_id1 = random_peer_id();
     let epoch_id0 = random_epoch_id();
 
-    let mut routing_table = RoutingTable::new(store);
+    let mut routing_table = RoutingTable::new(peer_id0.clone(), store);
 
     let announce0 = AnnounceAccount {
         account_id: "near0".parse().unwrap(),
@@ -48,7 +48,7 @@ fn dont_load_on_build() {
     let epoch_id0 = random_epoch_id();
     let epoch_id1 = random_epoch_id();
 
-    let mut routing_table = RoutingTable::new(store.clone());
+    let mut routing_table = RoutingTable::new(peer_id0.clone(), store.clone());
 
     let announce0 = AnnounceAccount {
         account_id: "near0".parse().unwrap(),
@@ -73,7 +73,7 @@ fn dont_load_on_build() {
         .all(|announce| { accounts.contains(announce) }));
     assert_eq!(routing_table.get_announce_accounts().len(), 2);
 
-    let mut routing_table1 = RoutingTable::new(store);
+    let mut routing_table1 = RoutingTable::new(peer_id0, store);
     assert!(routing_table1.get_announce_accounts().is_empty());
 }
 
@@ -84,8 +84,8 @@ fn load_from_disk() {
     let peer_id0 = random_peer_id();
     let epoch_id0 = random_epoch_id();
 
-    let mut routing_table = RoutingTable::new(store.clone());
-    let mut routing_table1 = RoutingTable::new(store.clone());
+    let mut routing_table = RoutingTable::new(peer_id0.clone(), store.clone());
+    let mut routing_table1 = RoutingTable::new(peer_id0.clone(), store.clone());
 
     let announce0 = AnnounceAccount {
         account_id: "near0".parse().unwrap(),

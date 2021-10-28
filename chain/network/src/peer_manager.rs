@@ -41,20 +41,20 @@ use crate::routing::SetAdvOptionsResult;
 use crate::{metrics, RoutingTableActor, RoutingTableMessages, RoutingTableMessagesResponse};
 
 use crate::routing::{
-    Edge, EdgeInfo, EdgeType, EdgeVerifierHelper, GetRoutingTableResult, PeerRequestResult,
-    RoutingTable, SimpleEdge, MAX_NUM_PEERS, SAVE_PEERS_AFTER_TIME,
+    Edge, EdgeInfo, EdgeType, EdgeVerifierHelper, PeerRequestResult, RoutingTable, SimpleEdge,
+    MAX_NUM_PEERS, SAVE_PEERS_AFTER_TIME,
 };
 
 use crate::edge_verifier::EdgeVerifier;
 use crate::types::{
     AccountOrPeerIdOrHash, Ban, BlockedPorts, Consolidate, ConsolidateResponse, EdgeList,
-    FullPeerInfo, GetRoutingTable, InboundTcpConnect, KnownPeerState, KnownPeerStatus,
-    KnownProducer, NetworkClientMessages, NetworkConfig, NetworkInfo, NetworkRequests,
-    NetworkResponses, NetworkViewClientMessages, NetworkViewClientResponses, OutboundTcpConnect,
-    PeerIdOrHash, PeerInfo, PeerManagerRequest, PeerMessage, PeerRequest, PeerResponse, PeerType,
-    PeersRequest, PeersResponse, Ping, Pong, QueryPeerStats, RawRoutedMessage, ReasonForBan,
-    RoutedMessage, RoutedMessageBody, RoutedMessageFrom, SendMessage, StateResponseInfo, StopMsg,
-    SyncData, Unregister,
+    FullPeerInfo, InboundTcpConnect, KnownPeerState, KnownPeerStatus, KnownProducer,
+    NetworkClientMessages, NetworkConfig, NetworkInfo, NetworkRequests, NetworkResponses,
+    NetworkViewClientMessages, NetworkViewClientResponses, OutboundTcpConnect, PeerIdOrHash,
+    PeerInfo, PeerManagerRequest, PeerMessage, PeerRequest, PeerResponse, PeerType, PeersRequest,
+    PeersResponse, Ping, Pong, QueryPeerStats, RawRoutedMessage, ReasonForBan, RoutedMessage,
+    RoutedMessageBody, RoutedMessageFrom, SendMessage, StateResponseInfo, StopMsg, SyncData,
+    Unregister,
 };
 #[cfg(feature = "test_features")]
 use crate::types::{GetPeerId, GetPeerIdResult, SetAdvOptions};
@@ -179,7 +179,7 @@ impl PeerManagerActor {
         let edge_verifier_pool = SyncArbiter::start(4, || EdgeVerifier {});
 
         let me: PeerId = config.public_key.clone().into();
-        let routing_table = RoutingTable::new(store);
+        let routing_table = RoutingTable::new(me.clone(), store);
 
         let txns_since_last_block = Arc::new(AtomicUsize::new(0));
 
@@ -245,6 +245,7 @@ impl PeerManagerActor {
         edges: Vec<Edge>,
         remove_pending_nonce: bool,
         try_to_remove_peer: bool,
+        broadcast_edges: bool,
     ) {
         if edges.len() == 0 {
             return;
@@ -258,8 +259,11 @@ impl PeerManagerActor {
                     let me = act2.peer_id.clone();
 
                     for edge in res.iter() {
+                        if !(edge.peer0 == me || edge.peer1 == me) {
+                            continue;
+                        }
                         act2.routing_table
-                            .edges_info
+                            .local_edges_info
                             .insert((edge.peer0.clone(), edge.peer1.clone()), edge.clone());
                         if remove_pending_nonce {
                             let other = edge.other(&act2.peer_id).unwrap();
@@ -294,6 +298,19 @@ impl PeerManagerActor {
                                 }
                             }
                         }
+                    }
+
+                    #[cfg(not(feature = "test_features"))]
+                    let condition = true;
+                    #[cfg(feature = "test_features")]
+                    let condition = !act2.adv_disable_edge_propagation;
+
+                    if condition && broadcast_edges {
+                        let new_data = SyncData { edges: res, accounts: Default::default() };
+                        act2.broadcast_message(
+                            ctx2,
+                            SendMessage { message: PeerMessage::RoutingTableSync(new_data) },
+                        )
                     }
                 }
                 _ => error!(target: "network", "expected AddIbfSetResponse"),
@@ -347,39 +364,15 @@ impl PeerManagerActor {
         let start = Instant::now();
         let mut new_edges = Vec::new();
         while let Some(edge) = self.routing_table_exchange_helper.edges_to_add_receiver.pop() {
-            // TODO (PIOTR, #4859) Remove this check
-            if let Some(cur_edge) =
-                self.routing_table.get_edge(edge.peer0.clone(), edge.peer1.clone())
-            {
-                if cur_edge.nonce >= edge.nonce {
-                    // We have newer update. Drop this.
-                    continue;
-                }
-            }
             new_edges.push(edge);
             if start.elapsed() >= BROAD_CAST_EDGES_MAX_WORK_ALLOWED {
                 break;
             }
         }
 
-        let new_data = SyncData { edges: new_edges.clone(), accounts: Default::default() };
-
-        if !new_data.is_empty() {
+        if !new_edges.is_empty() {
             // Add new edge update to the routing table.
-            self.add_verified_edges_to_routing_table(ctx, new_edges, false, true);
-            #[cfg(not(feature = "test_features"))]
-            let condition = true;
-            #[cfg(feature = "test_features")]
-            let condition = !self.adv_disable_edge_propagation;
-
-            if condition {
-                // TODO (PIOTR, #4859) Move this code inside add_verified_edges_to_routing_table.
-                // RoutingTableActor will filter out edges that need to be sent.
-                self.broadcast_message(
-                    ctx,
-                    SendMessage { message: PeerMessage::RoutingTableSync(new_data) },
-                )
-            }
+            self.add_verified_edges_to_routing_table(ctx, new_edges, false, true, true);
         };
 
         near_performance_metrics::actix::run_later(
@@ -495,7 +488,7 @@ impl PeerManagerActor {
             },
         );
 
-        self.add_verified_edges_to_routing_table(ctx, vec![new_edge.clone()], false, false);
+        self.add_verified_edges_to_routing_table(ctx, vec![new_edge.clone()], false, false, false);
 
         checked_feature!(
             "protocol_feature_routing_exchange_algorithm",
@@ -606,6 +599,7 @@ impl PeerManagerActor {
                 self.add_verified_edges_to_routing_table(
                     ctx,
                     vec![edge_update.clone()],
+                    false,
                     false,
                     false,
                 );
@@ -1830,6 +1824,7 @@ impl Handler<NetworkRequests> for PeerManagerActor {
                         vec![new_edge.clone()],
                         false,
                         false,
+                        false,
                     );
                     NetworkResponses::EdgeUpdate(Box::new(new_edge))
                 } else {
@@ -1838,7 +1833,13 @@ impl Handler<NetworkRequests> for PeerManagerActor {
             }
             NetworkRequests::ResponseUpdateNonce(edge) => {
                 if edge.contains_peer(&self.peer_id) && edge.verify() {
-                    self.add_verified_edges_to_routing_table(ctx, vec![edge.clone()], true, false);
+                    self.add_verified_edges_to_routing_table(
+                        ctx,
+                        vec![edge.clone()],
+                        true,
+                        false,
+                        false,
+                    );
                     NetworkResponses::NoResponse
                 } else {
                     NetworkResponses::BanPeer(ReasonForBan::InvalidEdge)
@@ -1915,22 +1916,6 @@ impl Handler<SetAdvOptions> for PeerManagerActor {
     }
 }
 
-impl Handler<GetRoutingTable> for PeerManagerActor {
-    type Result = GetRoutingTableResult;
-
-    #[perf]
-    fn handle(&mut self, msg: GetRoutingTable, _ctx: &mut Self::Context) -> GetRoutingTableResult {
-        GetRoutingTableResult {
-            edges_info: self
-                .routing_table
-                .edges_info
-                .iter()
-                .map(|(_, e)| (SimpleEdge::new(e.peer0.clone(), e.peer1.clone(), e.nonce)))
-                .collect(),
-        }
-    }
-}
-
 #[cfg(feature = "test_features")]
 #[cfg(feature = "protocol_feature_routing_exchange_algorithm")]
 impl Handler<crate::types::SetRoutingTable> for PeerManagerActor {
@@ -1940,7 +1925,7 @@ impl Handler<crate::types::SetRoutingTable> for PeerManagerActor {
     fn handle(&mut self, msg: crate::types::SetRoutingTable, ctx: &mut Self::Context) {
         if let Some(add_edges) = msg.add_edges {
             debug!(target: "network", "test_features add_edges {}", add_edges.len());
-            self.add_verified_edges_to_routing_table(ctx, add_edges, false, false);
+            self.add_verified_edges_to_routing_table(ctx, add_edges, false, false, false);
         }
         if let Some(remove_edges) = msg.remove_edges {
             debug!(target: "network", "test_features remove_edges {}", remove_edges.len());

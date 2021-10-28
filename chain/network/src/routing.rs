@@ -379,8 +379,7 @@ pub struct RoutingTable {
     /// Active PeerId that are part of the shortest path to each PeerId.
     pub peer_forwarding: HashMap<PeerId, Vec<PeerId>>,
     /// Store last update for known edges.
-    // TODO (PIOTR, #4859) Change this to store only edges of all peers that we are connected to.
-    pub edges_info: HashMap<(PeerId, PeerId), Edge>,
+    pub local_edges_info: HashMap<(PeerId, PeerId), Edge>,
     /// Hash of messages that requires routing back to respective previous hop.
     pub route_back: RouteBackCache,
     /// Access to store on disk
@@ -397,6 +396,7 @@ pub struct RoutingTable {
     waiting_pong: SizedCache<PeerId, SizedCache<usize, Instant>>,
     /// Last nonce sent to each peer through pings.
     last_ping_nonce: SizedCache<PeerId, usize>,
+    me: PeerId,
 }
 
 #[derive(Debug)]
@@ -408,13 +408,13 @@ pub enum FindRouteError {
 }
 
 impl RoutingTable {
-    pub fn new(store: Arc<Store>) -> Self {
+    pub fn new(me: PeerId, store: Arc<Store>) -> Self {
         // Find greater nonce on disk and set `component_nonce` to this value.
 
         Self {
             account_peers: SizedCache::with_size(ANNOUNCE_ACCOUNT_CACHE_SIZE),
             peer_forwarding: Default::default(),
-            edges_info: Default::default(),
+            local_edges_info: Default::default(),
             route_back: RouteBackCache::new(
                 ROUTE_BACK_CACHE_SIZE,
                 ROUTE_BACK_CACHE_EVICT_TIMEOUT,
@@ -426,6 +426,7 @@ impl RoutingTable {
             pong_info: SizedCache::with_size(PING_PONG_CACHE_SIZE),
             waiting_pong: SizedCache::with_size(PING_PONG_CACHE_SIZE),
             last_ping_nonce: SizedCache::with_size(PING_PONG_CACHE_SIZE),
+            me,
         }
     }
 
@@ -512,7 +513,7 @@ impl RoutingTable {
     pub fn remove_edges(&mut self, edges: &Vec<Edge>) {
         for edge in edges.iter() {
             let key = (edge.peer0.clone(), edge.peer1.clone());
-            self.edges_info.remove(&key);
+            self.local_edges_info.remove(&key);
         }
     }
 
@@ -629,8 +630,10 @@ impl RoutingTable {
     }
 
     pub fn get_edge(&self, peer0: PeerId, peer1: PeerId) -> Option<Edge> {
+        assert!(peer0 == self.me || peer1 == self.me);
+
         let key = Edge::key(peer0, peer1);
-        self.edges_info.get(&key).cloned()
+        self.local_edges_info.get(&key).cloned()
     }
 }
 #[derive(Debug)]
