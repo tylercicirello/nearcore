@@ -1803,7 +1803,6 @@ impl Handler<NetworkRequests> for PeerManagerActor {
                 NetworkResponses::NoResponse
             }
             NetworkRequests::RequestUpdateNonce(peer_id, edge_info) => {
-                // TODO rewrite
                 if Edge::partial_verify(self.peer_id.clone(), peer_id.clone(), &edge_info) {
                     if let Some(cur_edge) =
                         self.routing_table.get_edge(self.peer_id.clone(), peer_id.clone())
@@ -2060,7 +2059,6 @@ impl Handler<Consolidate> for PeerManagerActor {
             return ConsolidateResponse::Reject;
         }
 
-        // TODO rewrite
         let last_edge = self.routing_table.get_edge(self.peer_id.clone(), msg.peer_info.id.clone());
         let last_nonce = last_edge.as_ref().map_or(0, |edge| edge.nonce);
 
