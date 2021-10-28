@@ -160,7 +160,7 @@ impl RoutingTableTest {
     }
 
     fn update(&mut self) {
-        self.routing_table.update(true, false, SAVE_PEERS_AFTER_TIME);
+        self.routing_table.recalculate_routing_table(true, false, SAVE_PEERS_AFTER_TIME);
     }
 }
 

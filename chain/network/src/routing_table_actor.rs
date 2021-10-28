@@ -185,7 +185,15 @@ impl RoutingTableActor {
     }
 
     /// Recalculate routing table.
-    pub fn update(&mut self, can_save_edges: bool, force_pruning: bool, timeout: u64) -> Vec<Edge> {
+    ///
+    /// # Returns
+    /// List of edges removed.
+    pub fn recalculate_routing_table(
+        &mut self,
+        can_prune_edges: bool,
+        force_prune_edges: bool,
+        prune_edges_after_secs: u64,
+    ) -> Vec<Edge> {
         #[cfg(feature = "delay_detector")]
         let _d = DelayDetector::new("routing table update".into());
         let _routing_table_recalculation =
@@ -201,8 +209,9 @@ impl RoutingTableActor {
         }
 
         let mut edges_to_remove = Vec::new();
-        if can_save_edges {
-            edges_to_remove = self.prune_unrechable_edges_and_save_to_db(force_pruning, timeout);
+        if can_prune_edges {
+            edges_to_remove = self
+                .prune_unreachable_edges_and_save_to_db(force_prune_edges, prune_edges_after_secs);
         }
 
         near_metrics::inc_counter_by(&metrics::ROUTING_TABLE_RECALCULATIONS, 1);
@@ -210,10 +219,10 @@ impl RoutingTableActor {
         edges_to_remove
     }
 
-    fn prune_unrechable_edges_and_save_to_db(
+    fn prune_unreachable_edges_and_save_to_db(
         &mut self,
         force_pruning: bool,
-        timeout: u64,
+        prune_edges_after_secs: u64,
     ) -> Vec<Edge> {
         let now = chrono::Utc::now();
         let mut oldest_time = now;
@@ -222,7 +231,9 @@ impl RoutingTableActor {
             .iter()
             .filter_map(|(peer_id, last_time)| {
                 oldest_time = std::cmp::min(oldest_time, *last_time);
-                if now.signed_duration_since(*last_time).num_seconds() >= timeout as i64 {
+                if now.signed_duration_since(*last_time).num_seconds()
+                    >= prune_edges_after_secs as i64
+                {
                     Some(peer_id.clone())
                 } else {
                     None
@@ -278,10 +289,14 @@ impl RoutingTableActor {
     fn update_and_remove_edges(
         &mut self,
         can_save_edges: bool,
-        force_pruning: bool,
-        timeout: u64,
+        force_prune_edges: bool,
+        prune_edges_after_secs: u64,
     ) -> Vec<Edge> {
-        let edges_to_remove = self.update(can_save_edges, force_pruning, timeout);
+        let edges_to_remove = self.recalculate_routing_table(
+            can_save_edges,
+            force_prune_edges,
+            prune_edges_after_secs,
+        );
         edges_to_remove
     }
 
@@ -377,9 +392,9 @@ pub enum RoutingTableMessages {
         seed: u64,
     },
     RoutingTableUpdate {
-        can_save_edges: bool,
-        prune_edges: bool,
-        timeout: u64,
+        can_prune_edges: bool,
+        force_prune_edges: bool,
+        prune_edges_after_secs: u64,
     },
 }
 
@@ -449,9 +464,16 @@ impl Handler<RoutingTableMessages> for RoutingTableActor {
                     self.add_verified_edges_to_routing_table(edges),
                 )
             }
-            RoutingTableMessages::RoutingTableUpdate { can_save_edges, prune_edges, timeout } => {
-                let edges_to_remove =
-                    self.update_and_remove_edges(can_save_edges, prune_edges, timeout);
+            RoutingTableMessages::RoutingTableUpdate {
+                can_prune_edges,
+                force_prune_edges,
+                prune_edges_after_secs,
+            } => {
+                let edges_to_remove = self.update_and_remove_edges(
+                    can_prune_edges,
+                    force_prune_edges,
+                    prune_edges_after_secs,
+                );
                 RoutingTableMessagesResponse::RoutingTableUpdateResponse {
                     edges_to_remove,
                     peer_forwarding: self.peer_forwarding.clone(),

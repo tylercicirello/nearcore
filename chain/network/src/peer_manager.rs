@@ -215,12 +215,16 @@ impl PeerManagerActor {
     fn update_and_remove_edges(
         &mut self,
         ctx: &mut Context<Self>,
-        can_save_edges: bool,
-        prune_edges: bool,
-        timeout: u64,
+        can_prune_edges: bool,
+        force_prune_edges: bool,
+        prune_edges_after_secs: u64,
     ) {
         self.routing_table_addr
-            .send(RoutingTableMessages::RoutingTableUpdate { can_save_edges, prune_edges, timeout })
+            .send(RoutingTableMessages::RoutingTableUpdate {
+                can_prune_edges,
+                force_prune_edges,
+                prune_edges_after_secs,
+            })
             .into_actor(self)
             .map(|response, act, _| match response {
                 Ok(RoutingTableMessagesResponse::RoutingTableUpdateResponse {
@@ -321,12 +325,12 @@ impl PeerManagerActor {
 
     fn update_routing_table(&mut self, ctx: &mut Context<PeerManagerActor>) {
         #[cfg(feature = "test_features")]
-        let can_save_edges =
+        let can_prune_edges =
             self.edge_verifier_requests_in_progress == 0 && !self.adv_disable_edge_pruning;
         #[cfg(not(feature = "test_features"))]
-        let can_save_edges = self.edge_verifier_requests_in_progress == 0;
+        let can_prune_edges = self.edge_verifier_requests_in_progress == 0;
 
-        self.update_and_remove_edges(ctx, can_save_edges, false, SAVE_PEERS_AFTER_TIME);
+        self.update_and_remove_edges(ctx, can_prune_edges, false, SAVE_PEERS_AFTER_TIME);
 
         near_performance_metrics::actix::run_later(
             ctx,
