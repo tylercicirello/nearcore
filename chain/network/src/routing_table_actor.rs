@@ -150,7 +150,7 @@ impl RoutingTableActor {
         if let Ok(nonce) = self.component_nonce_from_peer(peer_id.clone()) {
             let mut update = self.store.store_update();
 
-            if let Ok(edges) = self.get_component_edges(nonce, &mut update) {
+            if let Ok(edges) = self.get_and_remove_component_edges(nonce, &mut update) {
                 for edge in edges {
                     for &peer_id in vec![&edge.peer0, &edge.peer1].iter() {
                         if peer_id == &me || self.peer_last_time_reachable.contains_key(peer_id) {
@@ -320,7 +320,7 @@ impl RoutingTableActor {
 
     /// Get all edges in the component with `nonce`
     /// Remove those edges from the store.
-    fn get_component_edges(
+    fn get_and_remove_component_edges(
         &mut self,
         nonce: u64,
         update: &mut StoreUpdate,
