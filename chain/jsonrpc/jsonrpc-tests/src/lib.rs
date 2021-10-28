@@ -1,5 +1,3 @@
-#[cfg(feature = "test_features")]
-use actix::Actor;
 use actix::Addr;
 use futures::{future, future::LocalBoxFuture, FutureExt, TryFutureExt};
 use serde_json::json;
@@ -10,15 +8,9 @@ use near_client::ViewClientActor;
 use near_jsonrpc::{start_http, RpcConfig};
 use near_jsonrpc_primitives::message::{from_slice, Message};
 #[cfg(feature = "test_features")]
-use near_network::routing_table_actor::make_routing_table_actor;
-#[cfg(feature = "test_features")]
-use near_network::test_utils::make_peer_manager;
+use near_network::test_utils::make_peer_manager_addr_pair;
 use near_network::test_utils::open_port;
-#[cfg(feature = "test_features")]
-use near_network::NetworkConfig;
 use near_primitives::types::NumBlocks;
-#[cfg(feature = "test_features")]
-use near_store::test_utils::create_test_store;
 
 lazy_static::lazy_static! {
     pub static ref TEST_GENESIS_CONFIG: GenesisConfig =
@@ -54,26 +46,7 @@ pub fn start_all_with_validity_period_and_no_epoch_sync(
     let addr = format!("127.0.0.1:{}", open_port());
 
     #[cfg(feature = "test_features")]
-    let seed = "test2";
-    #[cfg(feature = "test_features")]
-    let port = open_port();
-    #[cfg(feature = "test_features")]
-    let net_config = NetworkConfig::from_seed(seed, port);
-    #[cfg(feature = "test_features")]
-    let store = create_test_store();
-    #[cfg(feature = "test_features")]
-    let routing_table_addr =
-        make_routing_table_actor(net_config.public_key.clone().into(), store.clone());
-    #[cfg(feature = "test_features")]
-    let peer_manager_addr = make_peer_manager(
-        store,
-        net_config,
-        vec![("test1", open_port())],
-        10,
-        routing_table_addr.clone(),
-    )
-    .0
-    .start();
+    let (peer_manager_addr, routing_table_addr) = make_peer_manager_addr_pair();
 
     start_http(
         RpcConfig::new(&addr),

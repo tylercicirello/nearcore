@@ -632,12 +632,6 @@ impl RoutingTable {
         self.edges_info.get(&key).cloned()
     }
 }
-
-pub struct ProcessEdgeResult {
-    pub new_edge: bool,
-    pub edges: Vec<Edge>,
-}
-
 #[derive(Debug)]
 pub struct RoutingTableInfo {
     pub account_peers: HashMap<AccountId, PeerId>,

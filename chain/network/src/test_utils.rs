@@ -19,8 +19,10 @@ use near_primitives::hash::hash;
 use near_primitives::network::PeerId;
 use near_primitives::types::EpochId;
 use near_primitives::utils::index_to_bytes;
+use near_store::test_utils::create_test_store;
 use near_store::Store;
 
+use crate::routing_table_actor::make_routing_table_actor;
 use crate::types::{
     NetworkInfo, NetworkViewClientMessages, NetworkViewClientResponses, PeerInfo, ReasonForBan,
 };
@@ -277,6 +279,26 @@ impl MockNetworkAdapter {
     pub fn pop(&self) -> Option<NetworkRequests> {
         self.requests.write().unwrap().pop_front()
     }
+}
+
+#[allow(dead_code)]
+pub fn make_peer_manager_addr_pair() -> (Addr<PeerManagerActor>, Addr<RoutingTableActor>) {
+    let seed = "test2";
+    let port = open_port();
+    let net_config = NetworkConfig::from_seed(seed, port);
+    let store = create_test_store();
+    let routing_table_addr =
+        make_routing_table_actor(net_config.public_key.clone().into(), store.clone());
+    let peer_manager_addr = make_peer_manager(
+        store,
+        net_config,
+        vec![("test1", open_port())],
+        10,
+        routing_table_addr.clone(),
+    )
+    .0
+    .start();
+    (peer_manager_addr, routing_table_addr)
 }
 
 #[allow(dead_code)]
