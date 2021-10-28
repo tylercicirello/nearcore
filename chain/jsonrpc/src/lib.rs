@@ -320,7 +320,7 @@ impl JsonRpcHandler {
                             .map_err(|err| RpcError::serialization_error(err.to_string())),
                     )
                 }
-                "adv_get_routing_table_new" => {
+                "adv_get_routing_table" => {
                     let result = self
                         .routing_table_addr
                         .send(RoutingTableMessages::RequestRoutingTable)

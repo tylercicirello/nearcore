@@ -162,9 +162,9 @@ for (left, right, common, TIMEOUT) in tests:
 
     def adv_get_routing_table(n):
         logger.info("getting routing tables")
-        var_a = n[0].json_rpc("adv_get_routing_table_new", {},
+        var_a = n[0].json_rpc("adv_get_routing_table", {},
                               timeout=60)["result"]["edges_info"]
-        var_b = n[1].json_rpc("adv_get_routing_table_new", {},
+        var_b = n[1].json_rpc("adv_get_routing_table", {},
                               timeout=60)["result"]["edges_info"]
         var_a = {(x['key'][0], x['key'][1], x['nonce']) for x in var_a}
         var_b = {(x['key'][0], x['key'][1], x['nonce']) for x in var_b}
