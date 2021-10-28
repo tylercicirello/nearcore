@@ -253,11 +253,11 @@ impl PeerManagerActor {
                 Ok(RoutingTableMessagesResponse::AddVerifiedEdgesResponse(res)) => {
                     let me = act2.peer_id.clone();
 
-                    for edge in res.added_edges.iter() {
+                    for edge in res.iter() {
                         act2.routing_table
                             .edges_info
                             .insert((edge.peer0.clone(), edge.peer1.clone()), edge.clone());
-                        if res.new_edge && remove_pending_nonce {
+                        if remove_pending_nonce {
                             let other = edge.other(&act2.peer_id).unwrap();
                             if let Some(nonce) = act2.pending_update_nonce_request.get(&other) {
                                 if edge.nonce >= *nonce {

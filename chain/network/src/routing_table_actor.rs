@@ -50,12 +50,6 @@ pub struct RoutingTableActor {
     pub component_nonce: u64,
 }
 
-#[derive(Debug)]
-pub struct AddVerifiedEdgesResponse {
-    pub new_edge: bool,
-    pub added_edges: Vec<Edge>,
-}
-
 impl RoutingTableActor {
     pub fn new(peer_id: PeerId, store: Arc<Store>) -> Self {
         let component_nonce = store
@@ -114,9 +108,8 @@ impl RoutingTableActor {
 
     /// Add several edges to the current view of the network.
     /// These edges are assumed to be valid at this point.
-    /// Return true if some of the edges contains new information to the network.
-    pub fn process_edges(&mut self, edges: Vec<Edge>) -> ProcessEdgeResult {
-        let mut new_edge = false;
+    /// Return list of edges added.
+    pub fn process_edges(&mut self, edges: Vec<Edge>) -> Vec<Edge> {
         let total = edges.len();
         let mut result = Vec::with_capacity(edges.len() as usize);
 
@@ -127,7 +120,6 @@ impl RoutingTableActor {
             self.touch(&key.1);
 
             if self.add_edge(edge.clone()) {
-                new_edge = true;
                 result.push(edge);
             }
         }
@@ -136,7 +128,7 @@ impl RoutingTableActor {
         near_metrics::inc_counter_by(&metrics::EDGE_UPDATES, total as u64);
         near_metrics::set_gauge(&metrics::EDGE_ACTIVE, self.raw_graph.total_active_edges as i64);
 
-        ProcessEdgeResult { new_edge, edges: result }
+        result
     }
 
     /// If peer_id is not on memory check if it is on disk in bring it back on memory.
@@ -188,13 +180,8 @@ impl RoutingTableActor {
     }
 
     /// Add an edge update to the routing table and return if it is a new edge update.
-    fn add_verified_edges_to_routing_table(
-        &mut self,
-        edges: Vec<Edge>,
-    ) -> AddVerifiedEdgesResponse {
-        let ProcessEdgeResult { new_edge, edges } = self.process_edges(edges);
-
-        AddVerifiedEdgesResponse { new_edge, added_edges: edges }
+    fn add_verified_edges_to_routing_table(&mut self, edges: Vec<Edge>) -> Vec<Edge> {
+        self.process_edges(edges)
     }
 
     /// Recalculate routing table.
@@ -410,7 +397,7 @@ pub enum RoutingTableMessagesResponse {
     RequestRoutingTableResponse {
         edges_info: Vec<Edge>,
     },
-    AddVerifiedEdgesResponse(AddVerifiedEdgesResponse),
+    AddVerifiedEdgesResponse(Vec<Edge>),
     #[cfg(feature = "protocol_feature_routing_exchange_algorithm")]
     StartRoutingTableSyncResponse(PeerMessage),
     RoutingTableUpdateResponse {
