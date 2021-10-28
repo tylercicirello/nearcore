@@ -284,14 +284,12 @@ impl PeerManagerActor {
                                         EdgeType::Removed => {
                                             // Try to update the nonce, and in case it fails removes the peer.
                                             act2.try_update_nonce(ctx2, edge.clone(), other);
-                                            continue;
                                         }
                                     }
                                 } else {
                                     match edge.edge_type() {
                                         EdgeType::Added => {
                                             act2.wait_peer_or_remove(ctx2, edge.clone());
-                                            continue;
                                         }
                                         EdgeType::Removed => {}
                                     }
