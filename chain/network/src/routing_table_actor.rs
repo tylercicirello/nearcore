@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet};
 
 use actix::dev::MessageResponse;
-use actix::{Actor, Context, Handler, Message, System};
+use actix::{Actor, Addr, Context, Handler, Message, System};
 #[cfg(feature = "protocol_feature_routing_exchange_algorithm")]
 use tracing::error;
 use tracing::{debug, trace, warn};
@@ -631,4 +631,8 @@ impl Handler<RoutingTableMessages> for RoutingTableActor {
             }
         }
     }
+}
+
+pub fn make_routing_table_actor(peer_id: PeerId, store: Arc<Store>) -> Addr<RoutingTableActor> {
+    RoutingTableActor::new(peer_id, store).start()
 }

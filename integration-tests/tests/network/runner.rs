@@ -17,10 +17,11 @@ use near_client::{start_client, start_view_client};
 use near_crypto::KeyType;
 use near_logger_utils::init_test_logger;
 use near_network::test_utils::{
-    convert_boot_nodes, expected_routing_tables, make_routing_table_actor, open_port,
-    peer_id_from_seed, BanPeerSignal, GetInfo, StopSignal, WaitOrTimeout,
+    convert_boot_nodes, expected_routing_tables, open_port, peer_id_from_seed, BanPeerSignal,
+    GetInfo, StopSignal, WaitOrTimeout,
 };
 
+use near_network::routing_table_actor::make_routing_table_actor;
 #[cfg(feature = "test_features")]
 use near_network::types::SetAdvOptions;
 use near_network::types::{OutboundTcpConnect, ROUTED_MESSAGE_TTL};

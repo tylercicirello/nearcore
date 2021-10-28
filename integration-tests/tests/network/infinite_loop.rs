@@ -9,9 +9,8 @@ use futures::{future, FutureExt};
 use near_actix_test_utils::run_actix;
 use near_client::ClientActor;
 use near_logger_utils::init_integration_logger;
-use near_network::test_utils::{
-    convert_boot_nodes, make_routing_table_actor, open_port, GetInfo, WaitOrTimeout,
-};
+use near_network::routing_table_actor::make_routing_table_actor;
+use near_network::test_utils::{convert_boot_nodes, open_port, GetInfo, WaitOrTimeout};
 use near_network::types::{NetworkViewClientMessages, NetworkViewClientResponses, SyncData};
 use near_network::{NetworkClientResponses, NetworkConfig, NetworkRequests, PeerManagerActor};
 use near_primitives::block::GenesisId;

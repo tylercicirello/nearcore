@@ -278,10 +278,6 @@ impl MockNetworkAdapter {
     }
 }
 
-pub fn make_routing_table_actor(peer_id: PeerId, store: Arc<Store>) -> Addr<RoutingTableActor> {
-    RoutingTableActor::new(peer_id, store).start()
-}
-
 #[allow(dead_code)]
 pub fn make_peer_manager(
     store: Arc<Store>,
