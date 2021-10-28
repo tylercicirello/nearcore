@@ -353,13 +353,9 @@ impl PeerManagerActor {
 
         self.update_and_remove_edges(ctx, can_prune_edges, false, SAVE_PEERS_AFTER_TIME);
 
-        near_performance_metrics::actix::run_later(
-            ctx,
-            Duration::from_millis(1000),
-            move |act, ctx| {
-                act.update_routing_table(ctx);
-            },
-        );
+        near_performance_metrics::actix::run_later(ctx, Duration::from_secs(1), move |act, ctx| {
+            act.update_routing_table(ctx);
+        });
     }
 
     /// Receives list of edges that were verified, in a trigger every 20ms, and adds them to
