@@ -1,6 +1,6 @@
 use std::collections::{hash_map::Entry, HashMap, VecDeque};
 use std::sync::{Arc, Mutex};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 
 use cached::{Cached, SizedCache};
 use conqueue::{QueueReceiver, QueueSender};
@@ -37,7 +37,7 @@ const ROUND_ROBIN_NONCE_CACHE_SIZE: usize = 10_000;
 /// since `SAVE_PEERS_MAX_TIME` seconds. All peers disconnected since `SAVE_PEERS_AFTER_TIME`
 /// seconds will be removed from cache and persisted in disk.
 pub const SAVE_PEERS_MAX_TIME: u64 = 7_200;
-pub const SAVE_PEERS_AFTER_TIME: u64 = 3_600;
+pub const SAVE_PEERS_AFTER_TIME: Duration = Duration::from_secs(3_600);
 /// Graph implementation supports up to 128 peers.
 pub const MAX_NUM_PEERS: usize = 128;
 

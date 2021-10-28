@@ -42,14 +42,16 @@ impl RoutingTableTest {
             peers: vec![me.clone()],
             rev_peers: vec![(me, 0)].into_iter().collect(),
             times: vec![
-                now.checked_sub_signed(Duration::seconds((SAVE_PEERS_AFTER_TIME / 2) as i64))
-                    .unwrap(),
                 now.checked_sub_signed(Duration::seconds(
-                    ((SAVE_PEERS_AFTER_TIME + SAVE_PEERS_MAX_TIME) / 2) as i64,
+                    (SAVE_PEERS_AFTER_TIME.as_secs() / 2) as i64,
                 ))
                 .unwrap(),
                 now.checked_sub_signed(Duration::seconds(
-                    (SAVE_PEERS_MAX_TIME * 3 / 2 - SAVE_PEERS_AFTER_TIME / 2) as i64,
+                    ((SAVE_PEERS_AFTER_TIME.as_secs() + SAVE_PEERS_MAX_TIME) / 2) as i64,
+                ))
+                .unwrap(),
+                now.checked_sub_signed(Duration::seconds(
+                    (SAVE_PEERS_MAX_TIME * 3 / 2 - SAVE_PEERS_AFTER_TIME.as_secs() / 2) as i64,
                 ))
                 .unwrap(),
             ],

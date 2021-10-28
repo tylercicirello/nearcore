@@ -40,9 +40,15 @@ use crate::peer_store::{PeerStore, TrustLevel};
 use crate::routing::SetAdvOptionsResult;
 use crate::{metrics, RoutingTableActor, RoutingTableMessages, RoutingTableMessagesResponse};
 
+#[cfg(all(
+    feature = "test_features",
+    feature = "protocol_feature_routing_exchange_algorithm"
+))]
+use crate::routing::SimpleEdge;
+
 use crate::routing::{
-    Edge, EdgeInfo, EdgeType, EdgeVerifierHelper, PeerRequestResult, RoutingTable, SimpleEdge,
-    MAX_NUM_PEERS, SAVE_PEERS_AFTER_TIME,
+    Edge, EdgeInfo, EdgeType, EdgeVerifierHelper, PeerRequestResult, RoutingTable, MAX_NUM_PEERS,
+    SAVE_PEERS_AFTER_TIME,
 };
 
 use crate::edge_verifier::EdgeVerifier;
@@ -217,13 +223,13 @@ impl PeerManagerActor {
         ctx: &mut Context<Self>,
         can_prune_edges: bool,
         force_prune_edges: bool,
-        prune_edges_after_secs: u64,
+        prune_edges_after: Duration,
     ) {
         self.routing_table_addr
             .send(RoutingTableMessages::RoutingTableUpdate {
                 can_prune_edges,
                 force_prune_edges,
-                prune_edges_after_secs,
+                prune_edges_after,
             })
             .into_actor(self)
             .map(|response, act, _| match response {

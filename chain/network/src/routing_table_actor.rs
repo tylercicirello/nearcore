@@ -29,6 +29,7 @@ use near_store::db::DBCol::{ColComponentEdges, ColLastComponentNonce, ColPeerCom
 use near_store::{Store, StoreUpdate};
 use std::ops::Sub;
 use std::sync::Arc;
+use std::time::Duration;
 
 /// Actor that maintains routing table information.
 /// TODO (PIOTR, #4859) Finish moving routing table computation to new thread.
@@ -192,7 +193,7 @@ impl RoutingTableActor {
         &mut self,
         can_prune_edges: bool,
         force_prune_edges: bool,
-        prune_edges_after_secs: u64,
+        prune_edges_after: Duration,
     ) -> Vec<Edge> {
         #[cfg(feature = "delay_detector")]
         let _d = DelayDetector::new("routing table update".into());
@@ -209,7 +210,7 @@ impl RoutingTableActor {
         }
 
         let edges_to_remove = if can_prune_edges {
-            self.prune_unreachable_edges_and_save_to_db(force_prune_edges, prune_edges_after_secs)
+            self.prune_unreachable_edges_and_save_to_db(force_prune_edges, prune_edges_after)
         } else {
             Vec::new()
         };
@@ -222,7 +223,7 @@ impl RoutingTableActor {
     fn prune_unreachable_edges_and_save_to_db(
         &mut self,
         force_pruning: bool,
-        prune_edges_after_secs: u64,
+        prune_edges_after: Duration,
     ) -> Vec<Edge> {
         let now = chrono::Utc::now();
         let mut oldest_time = now;
@@ -232,7 +233,7 @@ impl RoutingTableActor {
             .filter_map(|(peer_id, last_time)| {
                 oldest_time = std::cmp::min(oldest_time, *last_time);
                 if now.signed_duration_since(*last_time).num_seconds()
-                    >= prune_edges_after_secs as i64
+                    >= prune_edges_after.as_secs() as i64
                 {
                     Some(peer_id.clone())
                 } else {
@@ -290,13 +291,10 @@ impl RoutingTableActor {
         &mut self,
         can_save_edges: bool,
         force_prune_edges: bool,
-        prune_edges_after_secs: u64,
+        prune_edges_after: Duration,
     ) -> Vec<Edge> {
-        let edges_to_remove = self.recalculate_routing_table(
-            can_save_edges,
-            force_prune_edges,
-            prune_edges_after_secs,
-        );
+        let edges_to_remove =
+            self.recalculate_routing_table(can_save_edges, force_prune_edges, prune_edges_after);
         edges_to_remove
     }
 
@@ -394,7 +392,7 @@ pub enum RoutingTableMessages {
     RoutingTableUpdate {
         can_prune_edges: bool,
         force_prune_edges: bool,
-        prune_edges_after_secs: u64,
+        prune_edges_after: Duration,
     },
 }
 
@@ -466,12 +464,12 @@ impl Handler<RoutingTableMessages> for RoutingTableActor {
             RoutingTableMessages::RoutingTableUpdate {
                 can_prune_edges,
                 force_prune_edges,
-                prune_edges_after_secs,
+                prune_edges_after,
             } => {
                 let edges_to_remove = self.update_and_remove_edges(
                     can_prune_edges,
                     force_prune_edges,
-                    prune_edges_after_secs,
+                    prune_edges_after,
                 );
                 RoutingTableMessagesResponse::RoutingTableUpdateResponse {
                     edges_to_remove,
