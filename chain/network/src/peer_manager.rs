@@ -1932,7 +1932,7 @@ impl Handler<crate::types::SetRoutingTable> for PeerManagerActor {
         }
         if let Some(true) = msg.prune_edges {
             debug!(target: "network", "test_features prune_edges");
-            self.update_and_remove_edges(ctx, true, true, 2);
+            self.update_and_remove_edges(ctx, true, true, Duration::from_secs(2));
         }
     }
 }

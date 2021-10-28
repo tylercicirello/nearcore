@@ -110,20 +110,18 @@ impl RoutingTableActor {
     /// Add several edges to the current view of the network.
     /// These edges are assumed to be valid at this point.
     /// Return list of edges added.
-    pub fn process_edges(&mut self, edges: Vec<Edge>) -> Vec<Edge> {
+    pub fn process_edges(&mut self, mut edges: Vec<Edge>) -> Vec<Edge> {
         let total = edges.len();
         let mut result = Vec::with_capacity(edges.len() as usize);
 
-        for edge in edges {
+        edges.retain(|edge| {
             let key = edge.get_pair();
 
             self.touch(&key.0);
             self.touch(&key.1);
 
-            if self.add_edge(edge.clone()) {
-                result.push(edge);
-            }
-        }
+            self.add_edge(edge.clone())
+        });
 
         // Update metrics after edge update
         near_metrics::inc_counter_by(&metrics::EDGE_UPDATES, total as u64);
