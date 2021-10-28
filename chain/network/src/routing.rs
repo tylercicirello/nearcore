@@ -379,6 +379,7 @@ pub struct RoutingTable {
     /// Active PeerId that are part of the shortest path to each PeerId.
     pub peer_forwarding: HashMap<PeerId, Vec<PeerId>>,
     /// Store last update for known edges.
+    // TODO (PIOTR, #4859) Change this to store only edges of all peers that we are connected to.
     pub edges_info: HashMap<(PeerId, PeerId), Edge>,
     /// Hash of messages that requires routing back to respective previous hop.
     pub route_back: RouteBackCache,

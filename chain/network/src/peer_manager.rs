@@ -347,8 +347,7 @@ impl PeerManagerActor {
         let start = Instant::now();
         let mut new_edges = Vec::new();
         while let Some(edge) = self.routing_table_exchange_helper.edges_to_add_receiver.pop() {
-            /*
-            TODO Make sure this is no longer needed.
+            // TODO (PIOTR, #4859) Remove this check
             if let Some(cur_edge) =
                 self.routing_table.get_edge(edge.peer0.clone(), edge.peer1.clone())
             {
@@ -357,7 +356,6 @@ impl PeerManagerActor {
                     continue;
                 }
             }
-             */
             new_edges.push(edge);
             if start.elapsed() >= BROAD_CAST_EDGES_MAX_WORK_ALLOWED {
                 break;
@@ -375,6 +373,8 @@ impl PeerManagerActor {
             let condition = !self.adv_disable_edge_propagation;
 
             if condition {
+                // TODO (PIOTR, #4859) Move this code inside add_verified_edges_to_routing_table.
+                // RoutingTableActor will filter out edges that need to be sent.
                 self.broadcast_message(
                     ctx,
                     SendMessage { message: PeerMessage::RoutingTableSync(new_data) },
