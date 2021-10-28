@@ -457,7 +457,6 @@ impl Handler<RoutingTableMessages> for RoutingTableActor {
 
     #[perf]
     fn handle(&mut self, msg: RoutingTableMessages, _ctx: &mut Self::Context) -> Self::Result {
-        debug!(target: "network", "RoutingTableMessages: {:?}", msg);
         match msg {
             RoutingTableMessages::AddVerifiedEdges { edges } => {
                 RoutingTableMessagesResponse::AddVerifiedEdgesResponse(
