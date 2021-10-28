@@ -93,7 +93,6 @@ impl RoutingTableActor {
 
     fn add_edge(&mut self, edge: Edge) -> bool {
         let key = edge.get_pair();
-
         if self.find_nonce(&key) >= edge.nonce {
             // We already have a newer information about this edge. Discard this information.
             false
@@ -106,6 +105,8 @@ impl RoutingTableActor {
                     self.raw_graph.remove_edge(&key.0, &key.1);
                 }
             }
+            #[cfg(feature = "protocol_feature_routing_exchange_algorithm")]
+            self.peer_ibf_set.add_edge(&edge.to_simple_edge());
             self.edges_info.insert(key, edge);
             true
         }
