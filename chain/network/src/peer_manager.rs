@@ -52,6 +52,7 @@ use crate::routing::{
 };
 
 use crate::edge_verifier::EdgeVerifier;
+use crate::routing_table_actor::Prune;
 use crate::types::{
     AccountOrPeerIdOrHash, Ban, BlockedPorts, Consolidate, ConsolidateResponse, EdgeList,
     FullPeerInfo, InboundTcpConnect, KnownPeerState, KnownPeerStatus, KnownProducer,
@@ -221,16 +222,11 @@ impl PeerManagerActor {
     fn update_and_remove_edges(
         &mut self,
         ctx: &mut Context<Self>,
-        can_prune_edges: bool,
-        force_prune_edges: bool,
+        prune: Prune,
         prune_edges_after: Duration,
     ) {
         self.routing_table_addr
-            .send(RoutingTableMessages::RoutingTableUpdate {
-                can_prune_edges,
-                force_prune_edges,
-                prune_edges_after,
-            })
+            .send(RoutingTableMessages::RoutingTableUpdate { prune, prune_edges_after })
             .into_actor(self)
             .map(|response, act, _| match response {
                 Ok(RoutingTableMessagesResponse::RoutingTableUpdateResponse {
@@ -354,7 +350,11 @@ impl PeerManagerActor {
         #[cfg(not(feature = "test_features"))]
         let can_prune_edges = self.edge_verifier_requests_in_progress == 0;
 
-        self.update_and_remove_edges(ctx, can_prune_edges, false, SAVE_PEERS_AFTER_TIME);
+        self.update_and_remove_edges(
+            ctx,
+            if can_prune_edges { Prune::Allow } else { Prune::Disable },
+            SAVE_PEERS_AFTER_TIME,
+        );
 
         near_performance_metrics::actix::run_later(ctx, Duration::from_secs(1), move |act, ctx| {
             act.update_routing_table(ctx);
@@ -1938,7 +1938,7 @@ impl Handler<crate::types::SetRoutingTable> for PeerManagerActor {
         }
         if let Some(true) = msg.prune_edges {
             debug!(target: "network", "test_features prune_edges");
-            self.update_and_remove_edges(ctx, true, true, Duration::from_secs(2));
+            self.update_and_remove_edges(ctx, Prune::Force, Duration::from_secs(2));
         }
     }
 }

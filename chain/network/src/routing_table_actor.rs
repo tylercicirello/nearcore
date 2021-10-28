@@ -31,6 +31,13 @@ use std::ops::Sub;
 use std::sync::Arc;
 use std::time::Duration;
 
+#[derive(Debug, Eq, PartialEq)]
+pub enum Prune {
+    Allow,
+    Force,
+    Disable,
+}
+
 /// Actor that maintains routing table information.
 /// TODO (PIOTR, #4859) Finish moving routing table computation to new thread.
 pub struct RoutingTableActor {
@@ -188,8 +195,7 @@ impl RoutingTableActor {
     /// List of edges removed.
     pub fn recalculate_routing_table(
         &mut self,
-        can_prune_edges: bool,
-        force_prune_edges: bool,
+        prune: Prune,
         prune_edges_after: Duration,
     ) -> Vec<Edge> {
         #[cfg(feature = "delay_detector")]
@@ -206,8 +212,8 @@ impl RoutingTableActor {
             self.peer_last_time_reachable.insert(peer.clone(), now);
         }
 
-        let edges_to_remove = if can_prune_edges {
-            self.prune_unreachable_edges_and_save_to_db(force_prune_edges, prune_edges_after)
+        let edges_to_remove = if prune != Prune::Disable {
+            self.prune_unreachable_edges_and_save_to_db(prune == Prune::Force, prune_edges_after)
         } else {
             Vec::new()
         };
@@ -281,17 +287,6 @@ impl RoutingTableActor {
         if let Err(e) = update.commit() {
             warn!(target: "network", "Error storing network component to store. {:?}", e);
         }
-        edges_to_remove
-    }
-
-    fn update_and_remove_edges(
-        &mut self,
-        can_save_edges: bool,
-        force_prune_edges: bool,
-        prune_edges_after: Duration,
-    ) -> Vec<Edge> {
-        let edges_to_remove =
-            self.recalculate_routing_table(can_save_edges, force_prune_edges, prune_edges_after);
         edges_to_remove
     }
 
@@ -387,8 +382,7 @@ pub enum RoutingTableMessages {
         seed: u64,
     },
     RoutingTableUpdate {
-        can_prune_edges: bool,
-        force_prune_edges: bool,
+        prune: Prune,
         prune_edges_after: Duration,
     },
 }
@@ -458,16 +452,8 @@ impl Handler<RoutingTableMessages> for RoutingTableActor {
                     self.add_verified_edges_to_routing_table(edges),
                 )
             }
-            RoutingTableMessages::RoutingTableUpdate {
-                can_prune_edges,
-                force_prune_edges,
-                prune_edges_after,
-            } => {
-                let edges_to_remove = self.update_and_remove_edges(
-                    can_prune_edges,
-                    force_prune_edges,
-                    prune_edges_after,
-                );
+            RoutingTableMessages::RoutingTableUpdate { prune, prune_edges_after } => {
+                let edges_to_remove = self.recalculate_routing_table(prune, prune_edges_after);
                 RoutingTableMessagesResponse::RoutingTableUpdateResponse {
                     edges_to_remove,
                     peer_forwarding: self.peer_forwarding.clone(),

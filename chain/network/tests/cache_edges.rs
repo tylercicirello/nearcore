@@ -6,6 +6,7 @@ use chrono::{DateTime, Duration, Utc};
 
 use near_crypto::Signature;
 use near_network::routing::{Edge, EdgeType, SAVE_PEERS_AFTER_TIME, SAVE_PEERS_MAX_TIME};
+use near_network::routing_table_actor::Prune;
 use near_network::test_utils::random_peer_id;
 use near_network::RoutingTableActor;
 use near_primitives::network::PeerId;
@@ -162,7 +163,7 @@ impl RoutingTableTest {
     }
 
     fn update(&mut self) {
-        self.routing_table.recalculate_routing_table(true, false, SAVE_PEERS_AFTER_TIME);
+        self.routing_table.recalculate_routing_table(Prune::Allow, SAVE_PEERS_AFTER_TIME);
     }
 }
 
