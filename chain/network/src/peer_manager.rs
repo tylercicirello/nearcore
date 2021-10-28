@@ -261,10 +261,10 @@ impl PeerManagerActor {
             .send(RoutingTableMessages::AddVerifiedEdges { edges })
             .into_actor(self)
             .map(move |response, act2, ctx2| match response {
-                Ok(RoutingTableMessagesResponse::AddVerifiedEdgesResponse(res)) => {
+                Ok(RoutingTableMessagesResponse::AddVerifiedEdgesResponse(filtered_edges)) => {
                     let me = act2.peer_id.clone();
 
-                    for edge in res.iter() {
+                    for edge in filtered_edges.iter() {
                         if !(edge.peer0 == me || edge.peer1 == me) {
                             continue;
                         }
@@ -310,7 +310,8 @@ impl PeerManagerActor {
                     let condition = !act2.adv_disable_edge_propagation;
 
                     if condition && broadcast_edges {
-                        let new_data = SyncData { edges: res, accounts: Default::default() };
+                        let new_data =
+                            SyncData { edges: filtered_edges, accounts: Default::default() };
                         act2.broadcast_message(
                             ctx2,
                             SendMessage { message: PeerMessage::RoutingTableSync(new_data) },
