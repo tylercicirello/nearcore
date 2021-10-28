@@ -140,14 +140,16 @@ impl RoutingTableActor {
     }
 
     /// If peer_id is not on memory check if it is on disk in bring it back on memory.
-    fn touch(&mut self, peer_id: &PeerId) {
-        if peer_id == self.peer_id() || self.peer_last_time_reachable.contains_key(peer_id) {
+    fn touch(&mut self, other_peer_id: &PeerId) {
+        if other_peer_id == self.peer_id()
+            || self.peer_last_time_reachable.contains_key(other_peer_id)
+        {
             return;
         }
 
         let me = self.peer_id().clone();
 
-        if let Ok(nonce) = self.component_nonce_from_peer(peer_id.clone()) {
+        if let Ok(nonce) = self.component_nonce_from_peer(other_peer_id.clone()) {
             let mut update = self.store.store_update();
 
             if let Ok(edges) = self.get_and_remove_component_edges(nonce, &mut update) {
@@ -177,7 +179,7 @@ impl RoutingTableActor {
                 warn!(target: "network", "Error removing network component from store. {:?}", e);
             }
         } else {
-            self.peer_last_time_reachable.insert(peer_id.clone(), chrono::Utc::now());
+            self.peer_last_time_reachable.insert(other_peer_id.clone(), chrono::Utc::now());
         }
     }
 
