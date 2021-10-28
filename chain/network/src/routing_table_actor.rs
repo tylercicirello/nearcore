@@ -202,7 +202,7 @@ impl RoutingTableActor {
 
         let mut edges_to_remove = Vec::new();
         if can_save_edges {
-            edges_to_remove = self.try_save_edges(force_pruning, timeout);
+            edges_to_remove = self.prune_unrechable_edges_and_save_to_db(force_pruning, timeout);
         }
 
         near_metrics::inc_counter_by(&metrics::ROUTING_TABLE_RECALCULATIONS, 1);
@@ -210,7 +210,11 @@ impl RoutingTableActor {
         edges_to_remove
     }
 
-    fn try_save_edges(&mut self, force_pruning: bool, timeout: u64) -> Vec<Edge> {
+    fn prune_unrechable_edges_and_save_to_db(
+        &mut self,
+        force_pruning: bool,
+        timeout: u64,
+    ) -> Vec<Edge> {
         let now = chrono::Utc::now();
         let mut oldest_time = now;
         let to_save = self
