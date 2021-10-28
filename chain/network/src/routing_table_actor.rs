@@ -291,7 +291,7 @@ impl RoutingTableActor {
     }
 
     #[cfg(feature = "protocol_feature_routing_exchange_algorithm")]
-    pub fn get_edges_by_id(&self, edges: Vec<SimpleEdge>) -> Vec<Edge> {
+    pub fn convert_simple_edges_to_edges(&self, edges: Vec<SimpleEdge>) -> Vec<Edge> {
         edges.iter().filter_map(|k| self.edges_info.get(&k.key()).cloned()).collect()
     }
 
