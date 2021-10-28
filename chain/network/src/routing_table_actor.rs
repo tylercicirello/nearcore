@@ -75,12 +75,19 @@ impl RoutingTableActor {
     }
 
     #[cfg(feature = "test_features")]
-    pub fn remove_edges(&mut self, edges: &Vec<Edge>) {
+    pub fn remove_edges(&mut self, edges: &[Edge]) {
         for edge in edges.iter() {
-            let key = (edge.peer0.clone(), edge.peer1.clone());
-            if self.edges_info.remove(&key).is_some() {
-                self.raw_graph.remove_edge(&edge.peer0, &edge.peer1);
-            }
+            self.remove_edge(edge);
+        }
+    }
+
+    pub fn remove_edge(&mut self, edge: &Edge) {
+        #[cfg(feature = "protocol_feature_routing_exchange_algorithm")]
+        self.peer_ibf_set.remove_edge(&edge.to_simple_edge());
+
+        let key = (edge.peer0.clone(), edge.peer1.clone());
+        if self.edges_info.remove(&key).is_some() {
+            self.raw_graph.remove_edge(&edge.peer0, &edge.peer1);
         }
     }
 
@@ -274,7 +281,6 @@ impl RoutingTableActor {
         edges_to_remove
     }
 
-    // PIOTR TODO
     fn update_and_remove_edges(
         &mut self,
         can_save_edges: bool,
@@ -282,14 +288,6 @@ impl RoutingTableActor {
         timeout: u64,
     ) -> Vec<Edge> {
         let edges_to_remove = self.update(can_save_edges, force_pruning, timeout);
-        /*
-        self.routing_table_pool
-            .send(RoutingTableMessages::RemoveEdges(edges_to_remove))
-            .into_actor(self)
-            .map(|_, _, _| ())
-            .spawn(ctx);
-            *?
-         */
         edges_to_remove
     }
 
@@ -368,8 +366,8 @@ pub enum RoutingTableMessages {
     AddVerifiedEdges {
         edges: Vec<Edge>,
     },
-    AddEdges(Vec<Edge>),
-    RemoveEdges(Vec<Edge>),
+    #[cfg(feature = "protocol_feature_routing_exchange_algorithm")]
+    AdvRemoveEdges(Vec<Edge>),
     RequestRoutingTable,
     #[cfg(feature = "protocol_feature_routing_exchange_algorithm")]
     AddPeerIfMissing(PeerId, Option<u64>),
@@ -450,6 +448,7 @@ impl Handler<RoutingTableMessages> for RoutingTableActor {
 
     #[perf]
     fn handle(&mut self, msg: RoutingTableMessages, _ctx: &mut Self::Context) -> Self::Result {
+        debug!(target: "network", "RoutingTableMessages: {:?}", msg);
         match msg {
             RoutingTableMessages::AddVerifiedEdges { edges } => {
                 RoutingTableMessagesResponse::AddVerifiedEdgesResponse(
@@ -475,23 +474,10 @@ impl Handler<RoutingTableMessages> for RoutingTableActor {
                     })),
                 )
             }
-            RoutingTableMessages::AddEdges(edges) => {
+            #[cfg(feature = "protocol_feature_routing_exchange_algorithm")]
+            RoutingTableMessages::AdvRemoveEdges(edges) => {
                 for edge in edges.iter() {
-                    #[cfg(feature = "protocol_feature_routing_exchange_algorithm")]
-                    {
-                        let se = edge.to_simple_edge();
-                        self.peer_ibf_set.add_edge(&se);
-                    }
-                    self.edges_info.insert((edge.peer0.clone(), edge.peer1.clone()), edge.clone());
-                }
-                RoutingTableMessagesResponse::Empty
-            }
-            RoutingTableMessages::RemoveEdges(edges) => {
-                for edge in edges.iter() {
-                    #[cfg(feature = "protocol_feature_routing_exchange_algorithm")]
-                    self.peer_ibf_set.remove_edge(&edge.to_simple_edge());
-
-                    self.edges_info.remove(&(edge.peer0.clone(), edge.peer1.clone()));
+                    self.remove_edge(edge);
                 }
                 RoutingTableMessagesResponse::Empty
             }

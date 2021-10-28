@@ -242,6 +242,10 @@ impl PeerManagerActor {
         remove_pending_nonce: bool,
         try_to_remove_peer: bool,
     ) {
+        if edges.len() == 0 {
+            return;
+        }
+
         self.routing_table_addr
             .send(RoutingTableMessages::AddVerifiedEdges { edges })
             .into_actor(self)
@@ -853,7 +857,7 @@ impl PeerManagerActor {
             .collect();
         self.routing_table.remove_edges(&edges);
         self.routing_table_addr
-            .send(RoutingTableMessages::RemoveEdges(edges))
+            .send(RoutingTableMessages::AdvRemoveEdges(edges))
             .into_actor(self)
             .map(|_, _, _| ())
             .spawn(ctx);
