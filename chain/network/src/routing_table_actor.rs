@@ -647,6 +647,6 @@ impl Handler<RoutingTableMessages> for RoutingTableActor {
     }
 }
 
-pub fn make_routing_table_actor(peer_id: PeerId, store: Arc<Store>) -> Addr<RoutingTableActor> {
+pub fn start_routing_table_actor(peer_id: PeerId, store: Arc<Store>) -> Addr<RoutingTableActor> {
     RoutingTableActor::new(peer_id, store).start()
 }

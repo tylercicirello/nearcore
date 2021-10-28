@@ -21,7 +21,7 @@ use near_network::test_utils::{
     GetInfo, StopSignal, WaitOrTimeout,
 };
 
-use near_network::routing_table_actor::make_routing_table_actor;
+use near_network::routing_table_actor::start_routing_table_actor;
 #[cfg(feature = "test_features")]
 use near_network::types::SetAdvOptions;
 use near_network::types::{OutboundTcpConnect, ROUTED_MESSAGE_TTL};
@@ -99,7 +99,7 @@ pub fn setup_network_node(
         );
 
         let routing_table_addr =
-            make_routing_table_actor(config.public_key.clone().into(), store.clone());
+            start_routing_table_actor(config.public_key.clone().into(), store.clone());
 
         PeerManagerActor::new(
             store.clone(),

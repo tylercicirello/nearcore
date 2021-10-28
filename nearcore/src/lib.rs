@@ -13,7 +13,7 @@ use near_chain::ChainGenesis;
 #[cfg(feature = "test_features")]
 use near_client::AdversarialControls;
 use near_client::{start_client, start_view_client, ClientActor, ViewClientActor};
-use near_network::routing_table_actor::make_routing_table_actor;
+use near_network::routing_table_actor::start_routing_table_actor;
 use near_network::{NetworkRecipient, PeerManagerActor};
 #[cfg(feature = "rosetta_rpc")]
 use near_rosetta_rpc::start_rosetta_rpc;
@@ -332,7 +332,7 @@ pub fn start_with_config(home_dir: &Path, config: NearConfig) -> NearNode {
     config.network_config.verify();
     let network_config = config.network_config;
     let routing_table_addr =
-        make_routing_table_actor(network_config.public_key.clone().into(), store.clone());
+        start_routing_table_actor(network_config.public_key.clone().into(), store.clone());
     #[cfg(all(feature = "json_rpc", feature = "test_features"))]
     let routing_table_addr2 = routing_table_addr.clone();
     let network_actor = PeerManagerActor::start_in_arbiter(&arbiter.handle(), move |_ctx| {

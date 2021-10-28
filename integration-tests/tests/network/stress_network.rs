@@ -10,7 +10,7 @@ use tracing::info;
 use near_actix_test_utils::run_actix;
 use near_client::{ClientActor, ViewClientActor};
 use near_logger_utils::init_test_logger_allow_panic;
-use near_network::routing_table_actor::make_routing_table_actor;
+use near_network::routing_table_actor::start_routing_table_actor;
 use near_network::test_utils::{convert_boot_nodes, open_port, GetInfo, StopSignal, WaitOrTimeout};
 use near_network::types::{NetworkViewClientMessages, NetworkViewClientResponses};
 use near_network::{NetworkClientResponses, NetworkConfig, PeerManagerActor};
@@ -44,7 +44,7 @@ fn make_peer_manager(seed: &str, port: u16, boot_nodes: Vec<(&str, u16)>) -> Pee
     .start();
     let net_config = NetworkConfig::from_seed(seed, port);
     let routing_table_addr =
-        make_routing_table_actor(net_config.public_key.clone().into(), store.clone());
+        start_routing_table_actor(net_config.public_key.clone().into(), store.clone());
 
     PeerManagerActor::new(
         store,
