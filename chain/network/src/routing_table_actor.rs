@@ -208,11 +208,11 @@ impl RoutingTableActor {
             self.peer_last_time_reachable.insert(peer.clone(), now);
         }
 
-        let mut edges_to_remove = Vec::new();
-        if can_prune_edges {
-            edges_to_remove = self
-                .prune_unreachable_edges_and_save_to_db(force_prune_edges, prune_edges_after_secs);
-        }
+        let edges_to_remove = if can_prune_edges {
+            self.prune_unreachable_edges_and_save_to_db(force_prune_edges, prune_edges_after_secs)
+        } else {
+            Vec::new()
+        };
 
         near_metrics::inc_counter_by(&metrics::ROUTING_TABLE_RECALCULATIONS, 1);
         near_metrics::set_gauge(&metrics::PEER_REACHABLE, self.peer_forwarding.len() as i64);
