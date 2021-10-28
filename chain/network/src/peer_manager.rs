@@ -1806,7 +1806,7 @@ impl Handler<NetworkRequests> for PeerManagerActor {
                         if cur_edge.edge_type() == EdgeType::Added
                             && cur_edge.nonce >= edge_info.nonce
                         {
-                            return NetworkResponses::EdgeUpdate(Box::new(cur_edge));
+                            return NetworkResponses::EdgeUpdate(Box::new(cur_edge.clone()));
                         }
                     }
 
@@ -2053,7 +2053,7 @@ impl Handler<Consolidate> for PeerManagerActor {
         if last_nonce >= msg.other_edge_info.nonce {
             debug!(target: "network", "Too low nonce. ({} <= {}) {:?} {:?}", msg.other_edge_info.nonce, last_nonce, self.peer_id, msg.peer_info.id);
             // If the check fails don't allow this connection.
-            return ConsolidateResponse::InvalidNonce(last_edge.map(Box::new).unwrap());
+            return ConsolidateResponse::InvalidNonce(last_edge.cloned().map(Box::new).unwrap());
         }
 
         if msg.other_edge_info.nonce >= Edge::next_nonce(last_nonce) + EDGE_NONCE_BUMP_ALLOWED {

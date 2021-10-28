@@ -629,11 +629,11 @@ impl RoutingTable {
         }
     }
 
-    pub fn get_edge(&self, peer0: PeerId, peer1: PeerId) -> Option<Edge> {
+    pub fn get_edge(&self, peer0: PeerId, peer1: PeerId) -> Option<&Edge> {
         assert!(peer0 == self.me || peer1 == self.me);
 
         let key = Edge::key(peer0, peer1);
-        self.local_edges_info.get(&key).cloned()
+        self.local_edges_info.get(&key)
     }
 }
 #[derive(Debug)]

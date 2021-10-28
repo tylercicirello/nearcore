@@ -112,8 +112,6 @@ impl RoutingTableActor {
     /// Return list of edges added.
     pub fn process_edges(&mut self, mut edges: Vec<Edge>) -> Vec<Edge> {
         let total = edges.len();
-        let mut result = Vec::with_capacity(edges.len() as usize);
-
         edges.retain(|edge| {
             let key = edge.get_pair();
 
@@ -127,7 +125,7 @@ impl RoutingTableActor {
         near_metrics::inc_counter_by(&metrics::EDGE_UPDATES, total as u64);
         near_metrics::set_gauge(&metrics::EDGE_ACTIVE, self.raw_graph.total_active_edges as i64);
 
-        result
+        edges
     }
 
     /// If peer_id is not on memory check if it is on disk in bring it back on memory.
